@@ -1,4 +1,4 @@
-/* Quiz Party styles.
+/* Storybook Arcade styles.
    Colors come from the Ms. Gamification brand: Sky Blue, Light Blue, Mint, Yellow, Black, White,
    with Pink used only as a button accent. One font family (Poppins), bundled so nothing loads from outside. */
 
@@ -132,7 +132,7 @@ textarea { resize: vertical; }
 .home { max-width: 30rem; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 1.2rem; align-items: stretch; padding-top: .5rem; }
 .brand { text-align: center; }
 .mascot { width: 6rem; height: 6rem; display: block; margin: 0 auto .2rem; filter: drop-shadow(0 4px 0 rgba(20,24,31,.15)); }
-.logo { font-size: 2.6rem; margin: 0; letter-spacing: -.02em; }
+.logo { font-size: clamp(2.1rem, 9vw, 2.8rem); margin: 0; letter-spacing: -.02em; text-wrap: balance; line-height: 1.05; }
 .byline { margin: 0; font-weight: 600; color: var(--soft); }
 .join-form h2 { text-align: center; }
 .join-form .btn { width: 100%; }

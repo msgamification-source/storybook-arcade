@@ -12,7 +12,7 @@
 import { PEER_OPTIONS } from './config.js';
 import { uid } from './util.js';
 
-const PREFIX = 'quizparty-';
+const PREFIX = 'storybookarcade-';
 const getPeer = () => window.Peer || (window.peerjs && window.peerjs.Peer);
 const randomPin = () => String(Math.floor(100000 + Math.random() * 900000));
 const err = (type, message) => Object.assign(new Error(message || type), { type });
@@ -59,7 +59,7 @@ function peerHost(pin) {
 }
 
 function localHost(pin) {
-  const bc = new BroadcastChannel('quizparty-local-' + pin);
+  const bc = new BroadcastChannel('storybookarcade-local-' + pin);
   const known = new Set();
   const api = {
     kind: 'local', pin,
@@ -95,7 +95,7 @@ export async function connectToGame(pin) {
 
 function localClient(pin, timeoutMs = 400) {
   return new Promise((resolve, reject) => {
-    const bc = new BroadcastChannel('quizparty-local-' + pin);
+    const bc = new BroadcastChannel('storybookarcade-local-' + pin);
     const id = uid();
     let done = false;
     const api = {

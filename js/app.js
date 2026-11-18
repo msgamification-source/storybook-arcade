@@ -1,4 +1,4 @@
-// Quiz Party: home screen, join form, quiz library and game setup. Everything else lives in
+// Storybook Arcade: home screen, join form, quiz library and game setup. Everything else lives in
 // host.js (teacher), player.js (students) and editor.js (quiz maker).
 
 import {

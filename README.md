@@ -1,9 +1,9 @@
-# Quiz Party
+# Storybook Arcade
 
 A live classroom quiz game in the style of Kahoot, Gimkit and Blooket. Kids join with a PIN on any
 device, answer on their own screen, and watch the leaderboard on the big screen.
 
-![Quiz Party screens: teacher lobby, question, results, race, and student phones](docs/preview.png)
+![Storybook Arcade screens: teacher lobby, question, results, race, and student phones](docs/preview.png)
 
 It is a plain static website. No accounts, no database, no server to run, and nothing is stored
 about students. It can live for free on GitHub Pages.
@@ -70,7 +70,7 @@ class, run your own broker. The `server/` folder is a ready to deploy one (about
 
 ```html
 <script>
-  window.QUIZ_PARTY_PEER_OPTIONS = { host: 'your-broker.onrender.com', port: 443, secure: true, path: '/' };
+  window.STORYBOOK_ARCADE_PEER_OPTIONS = { host: 'your-broker.onrender.com', port: 443, secure: true, path: '/' };
 </script>
 ```
 

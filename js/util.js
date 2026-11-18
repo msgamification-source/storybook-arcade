@@ -110,7 +110,7 @@ export const SHAPE_NAMES = ['Heart', 'Star', 'Moon', 'Flower'];
 export const shapeIcon = (i) =>
   raw(`<svg class="shape" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${SHAPE_SVG[i % 4]}</svg>`);
 
-// The Quiz Party star mascot.
+// The Storybook Arcade star mascot.
 export const mascot = (cls = '') => raw(`
 <svg class="mascot ${cls}" viewBox="0 0 100 100" role="img" aria-label="Smiling star mascot">
   <polygon points="50,10 64.1,34.6 91.9,40.4 72.8,61.4 75.9,89.6 50,78 24.1,89.6 27.2,61.4 8.2,40.4 35.9,34.6"

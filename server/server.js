@@ -6,5 +6,5 @@ const { PeerServer } = require('peer');
 
 const port = Number(process.env.PORT) || 9000;
 PeerServer({ port, host: '0.0.0.0', path: '/', allow_discovery: false, proxied: true }, () => {
-  console.log(`Quiz Party broker listening on port ${port}`);
+  console.log(`Storybook Arcade broker listening on port ${port}`);
 });

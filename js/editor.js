@@ -135,7 +135,7 @@ actions['e-export'] = () => {
   const r = normalizeQuiz(E.quiz);
   if (r.error) return showError(r);
   const name = r.quiz.title.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'quiz';
-  downloadFile(`${name}.quizparty.json`, JSON.stringify({ format: 'quizparty', version: 1, ...r.quiz }, null, 2), 'application/json');
+  downloadFile(`${name}.storybook-arcade.json`, JSON.stringify({ format: 'storybook-arcade', version: 1, ...r.quiz }, null, 2), 'application/json');
 };
 
 actions['e-cancel'] = () => {

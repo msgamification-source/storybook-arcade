@@ -17,4 +17,5 @@ export const BUDDIES = [
   { id: 'eagle', name: 'Eagle' },
   { id: 'gator', name: 'Gator' },
   { id: 'axolotl', name: 'Axolotl' },
+  { id: 'penguin', name: 'Penguin' },
 ];
