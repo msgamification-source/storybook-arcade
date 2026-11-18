@@ -85,6 +85,40 @@ export const BUILTIN = [
       q('Which sentence uses the word "bat" to mean an animal?', ['He swung the bat at the ball.', 'A bat flew out of the cave at night.', 'Please hand me the bat.', 'The bat is made of wood.'], 1, 20),
     ],
   },
+  {
+    id: 'builtin-hyperbole', builtin: true, emoji: '🔍', grade: '3-5',
+    title: 'Hyperbole Hunt',
+    desc: 'Spot the big exaggerations and tell what they really mean.',
+    questions: [
+      q('Which sentence is an example of hyperbole?', ['The test was really hard.', 'I studied for a million years for this test.', 'The test had twenty questions.', 'I studied for an hour.'], 1),
+      q('Which sentence uses hyperbole?', ['My little brother is a loud drum.', 'My little brother is so loud that the whole planet can hear him.', 'My little brother is loud.', 'My little brother plays the drums.'], 1),
+      q('What is the hyperbole in this sentence? "I have told you a billion times to clean your room!"', ['I have told you', 'a billion times', 'to clean', 'your room'], 1),
+      q('Which sentence is NOT a hyperbole?', ['I am so tired I could sleep for a year.', 'The line was a mile long.', 'I walked two miles to school today.', 'My backpack weighs a ton.'], 2, 25),
+      q('Dad said, "I am so hungry I could eat a horse!" What does he really mean?', ['He plans to eat a horse.', 'He is very hungry.', 'He is allergic to horses.', 'He does not like dinner.'], 1),
+      q('"It was so cold that my words froze in the air." What is the author trying to show?', ['It was extremely cold.', 'Words can really freeze.', 'The speaker was quiet.', 'It was a sunny day.'], 0, 25),
+      q('Which sentence is a simile, not a hyperbole?', ['I am so excited I could jump to the moon.', 'My room is a disaster zone.', 'She was as quiet as a mouse.', 'I have a million things to do.'], 2, 25),
+      q('Which sentence is an idiom, not a hyperbole?', ['I am so hungry I could eat the whole kitchen.', 'She spilled the beans about the surprise party.', 'This suitcase weighs a million pounds.', 'The movie lasted a hundred years.'], 1, 25),
+      q('Which sentence is the BEST hyperbole to show how big a dog is?', ['My dog is large.', 'My dog is so big he needs his own zip code.', 'My dog weighs sixty pounds.', 'My dog is bigger than my cat.'], 1, 25),
+      q('Why might an author use hyperbole?', ['To make a point stronger or funnier', 'To give exact facts and numbers', 'To confuse the reader', 'To list the steps in a recipe'], 0),
+    ],
+  },
+  {
+    id: 'builtin-theme', builtin: true, emoji: '🕵️', grade: '3-5',
+    title: 'Theme Detectives',
+    desc: 'Read tiny stories and find the lesson hiding in each one.',
+    questions: [
+      q('Which one is a THEME (a lesson or message), not just a topic?', ['Friendship', 'A dog and a cat', 'True friends help each other when things are hard', 'The park'], 2, 25),
+      q('What is the theme of a story?', ['The main character', 'The lesson or message the author wants you to learn', 'Where the story takes place', 'The title of the story'], 1),
+      q('Ravi fell off his bike three times and scraped his knee. Each time he climbed back on. By the end of the day, he rode all the way down the street. What is the theme?', ['Bikes are dangerous.', 'Never give up, even when something is hard.', 'Knees heal quickly.', 'Always wear a helmet.'], 1, 30),
+      q('Mia said she did not break the vase, but her mom found the pieces behind the couch. Mia felt terrible, so she told the truth and said sorry. Her mom hugged her. What is the theme?', ['Vases are expensive.', 'Telling the truth is the right thing to do.', 'Never play inside.', 'Moms see everything.'], 1, 30),
+      q('Two squirrels tugged on one acorn until it broke in half. Then they spotted a tree full of acorns, enough for everyone. What is the theme?', ['Acorns grow on trees.', 'Squirrels are strong.', 'Sharing and working together is better than fighting.', 'Always climb high.'], 2, 30),
+      q('A story is about a girl who learns to share. Which detail best SUPPORTS the theme "Sharing makes everyone happy"?', ['The girl has long brown hair.', 'The girl gives half her snack to a lonely classmate, and both of them smile.', 'The story takes place in the fall.', 'The girl\'s backpack is red.'], 1, 30),
+      q('Everyone laughed at Omar\'s old, patched backpack. Then he pulled out a notebook full of amazing drawings, and the class gasped. What is the theme?', ['Backpacks should be new.', 'Do not judge someone by how they look on the outside.', 'Drawing is easy.', 'Notebooks are useful.'], 1, 30),
+      q('A boy practices piano until he can play a whole song. A girl practices free throws every day until she makes the winning shot. What theme do both stories share?', ['Music and sports are the same.', 'Practice and hard work help you reach your goals.', 'Winning is everything.', 'Always play alone.'], 1, 30),
+      q('In the story of the tortoise and the hare, the slow tortoise wins the race. Which one is NOT a good theme for this story?', ['Slow and steady can win the race.', 'Bragging can cause you to lose.', 'Hard work beats showing off.', 'Rabbits are always faster.'], 3, 25),
+      q('How do readers figure out a theme?', ['By looking at what the characters learn and how the problem is solved', 'By counting the pages', 'By reading only the first sentence', 'By looking at the pictures only'], 0, 25),
+    ],
+  },
 ];
 
 // The skill each starter question practices. The Skills report groups by these.
@@ -92,6 +126,8 @@ const SKILLS = {
   'builtin-pos': ['Nouns', 'Verbs', 'Adjectives', 'Adverbs', 'Nouns', 'Pronouns', 'Verbs', 'Adjectives', 'Adverbs', 'Nouns'],
   'builtin-figurative': ['Simile', 'Metaphor', 'Idioms', 'Hyperbole', 'Personification', 'Alliteration', 'Onomatopoeia', 'Idioms', 'Simile', 'Personification'],
   'builtin-grammar': ['End punctuation', 'Capital letters', 'Apostrophes', 'Apostrophes', 'Commas', 'Quotation marks', 'Homophones', 'Complete sentences', 'Homophones', 'Subject-verb agreement'],
+  'builtin-hyperbole': ['Spotting hyperbole', 'Spotting hyperbole', 'Spotting hyperbole', 'Spotting hyperbole', 'What hyperbole means', 'What hyperbole means', 'Hyperbole or something else?', 'Hyperbole or something else?', 'Writing and purpose', 'Writing and purpose'],
+  'builtin-theme': ['Theme vs. topic', 'Theme vs. topic', 'Finding the theme', 'Finding the theme', 'Finding the theme', 'Using text evidence', 'Finding the theme', 'Finding the theme', 'Finding the theme', 'Using text evidence'],
   'builtin-vocab': ['Prefixes', 'Prefixes', 'Suffixes', 'Suffixes', 'Prefixes', 'Synonyms and antonyms', 'Synonyms and antonyms', 'Context clues', 'Context clues', 'Multiple-meaning words'],
 };
 BUILTIN.forEach((b) => (SKILLS[b.id] || []).forEach((skill, i) => { if (b.questions[i]) b.questions[i].skill = skill; }));

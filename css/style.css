@@ -215,16 +215,16 @@ textarea { resize: vertical; }
 
 /* ---------- Host: question ---------- */
 .qscreen { padding: 1rem 1.5rem 1.5rem; gap: .5rem; }
-.qmain { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; text-align: center; padding: 1rem 0; min-height: 28vh; }
+.qmain { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem; text-align: center; padding: .4rem 0; min-height: 0; }
 .qtext { font-size: clamp(1.5rem, 3.2vw, 3rem); max-width: 62rem; margin: 0; }
-.timer { width: 5.2rem; height: 5.2rem; display: grid; place-items: center; font-size: 2.2rem; font-weight: 800; background: var(--sun); border: var(--line); border-radius: 50%; box-shadow: var(--pop); }
+.timer { width: clamp(3.6rem, 9vh, 5.2rem); height: clamp(3.6rem, 9vh, 5.2rem); display: grid; place-items: center; font-size: clamp(1.6rem, 4vh, 2.2rem); font-weight: 800; background: var(--sun); border: var(--line); border-radius: 50%; box-shadow: var(--pop); }
 .timer.ghost { visibility: hidden; }
 .timer.low { background: var(--pink); animation: shake .5s ease-in-out infinite; }
 .answered { font-size: 1.2rem; }
 .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; width: 100%; max-width: 80rem; margin: 0 auto; }
 .opts.n3 .opt:nth-child(3) { grid-column: 1 / -1; }
-.qscreen .opt { min-height: 6.5rem; font-size: 1.5rem; padding: 1rem 1.3rem; }
-.qscreen .badge { width: 3.4rem; height: 3.4rem; }
+.qscreen .opt { min-height: clamp(4rem, 11vh, 6.5rem); font-size: clamp(1.1rem, 2.7vh, 1.5rem); padding: .6rem 1.2rem; }
+.qscreen .badge { width: clamp(2.6rem, 6.4vh, 3.4rem); height: clamp(2.6rem, 6.4vh, 3.4rem); }
 .qscreen .badge .shape { width: 1.9rem; height: 1.9rem; }
 .timebar { height: 1rem; margin-top: 1rem; background: var(--white); border: var(--line); border-radius: 999px; overflow: hidden; }
 .timebar i { display: block; height: 100%; width: 100%; background: var(--pink); transition: width .2s linear; }
@@ -551,3 +551,5 @@ textarea { resize: vertical; }
   .qrev, .skrow { break-inside: avoid; }
   .v-report { background: #fff; }
 }
+
+.qtext.long { font-size: clamp(1.15rem, 2.1vw, 2rem); line-height: 1.25; }

@@ -458,7 +458,7 @@ function renderQuestion() {
     </header>
     <main class="qmain">
       <div class="timer" id="timer" aria-hidden="true"><span id="t-num">${q.time}</span></div>
-      <h1 class="qtext">${q.text}</h1>
+      <h1 class="qtext ${q.text.length > 110 ? 'long' : ''}">${q.text}</h1>
     </main>
     ${optsHtml(q, null)}
     <div class="timebar" aria-hidden="true"><i id="tbar"></i></div>`);
@@ -493,7 +493,7 @@ function renderReveal() {
       <div class="answered"><b>${G.answers.size}</b> of ${connected().length} answered</div>
       <div class="row">${autoButton()}<button class="btn btn-ghost" data-action="h-end">End game</button><button class="btn btn-pink" data-action="h-next">${last ? 'See results' : 'Next'} &rarr;</button></div>
     </header>
-    <main class="qmain"><div class="timer ghost" aria-hidden="true"></div><h1 class="qtext">${q.text}</h1></main>
+    <main class="qmain"><div class="timer ghost" aria-hidden="true"></div><h1 class="qtext ${q.text.length > 110 ? 'long' : ''}">${q.text}</h1></main>
     ${optsHtml(q, G.counts)}`);
   scheduleAuto();
 }
