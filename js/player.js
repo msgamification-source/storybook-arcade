@@ -1,11 +1,12 @@
 // The student's side: join a game, answer questions on their own device.
 
 import {
-  html, setScreen, byId, actions, nav, pick, sfx, confetti, shapeIcon, mascot, uid, session, mmss, avatarHtml,
+  html, raw, setScreen, byId, actions, nav, pick, sfx, confetti, shapeIcon, mascot, uid, session, mmss, avatarHtml,
   pose, icon, medalImg, countUp,
   isMuted, setSoundRole,
 } from './util.js';
 import { connectToGame, friendlyError } from './transport.js';
+import { storyHtml, speak, canSpeak, stopSpeaking } from './story.js';
 
 const KEY = 'quizparty.player';
 const PRAISE = ['Nice!', 'You got it!', 'Awesome!', 'Brilliant!', 'Yes!', 'Great job!'];
@@ -30,7 +31,7 @@ export async function joinGame({ pin, name, avatar, pid, quiet = false }) {
 
 function attach(transport, info) {
   teardown();
-  S = { ...info, transport, mode: 'live', title: '', phase: 'joining', timers: [], left: false, ended: false, reconnecting: false };
+  S = { ...info, coins: 0, transport, mode: 'live', title: '', phase: 'joining', timers: [], left: false, ended: false, reconnecting: false };
   transport.onMessage = onMsg;
   transport.onClose = onLost;
   transport.send({ t: 'join', pid: S.pid, name: S.name, avatar: S.avatar });
@@ -107,11 +108,16 @@ function onMsg(m) {
     case 'q': S.phase = 'question'; S.q = m; S.chosen = null; S.qEnds = Date.now() + m.left * 1000; renderQuestion(); break;
     case 'ack': S.chosen = m.c; renderLocked(); break;
     case 'r': S.phase = 'result'; renderResult(m); break;
-    case 'rs': S.race = { total: m.total, ends: Date.now() + m.secs * 1000 }; S.phase = 'race'; break;
-    case 'rq': S.rq = m; S.rpick = null; S.rfb = null; renderRaceQ(); break;
-    case 'rr': S.rfb = m; renderRaceQ(); break;
+    case 'rs': S.race = { total: m.total, ends: Date.now() + m.secs * 1000 }; S.phase = 'race'; if (m.mode) S.mode = m.mode; break;
+    case 'rq': S.coins = m.score; S.rq = m; S.rpick = null; S.rfb = null; renderRaceQ(); break;
+    case 'rr': S.coins = m.score; S.rfb = m; renderRaceQ(); break;
+    case 'gate': S.coins = m.coins; renderGate(m.s); break;
+    case 'gr': renderPrize(m); break;
+    case 'ev': onEvent(m); break;
     case 'rf': renderRaceDone(m); break;
-    case 'end': S.ended = true; S.phase = 'end'; renderEnd(m); break;
+    case 'end': S.ended = true; S.phase = 'end'; S.endMsg = m; renderEnd(m); break;
+    case 'sp': S.story = m; renderStoryPage(m); break;
+    case 'sx': stopSpeaking(); if (S.endMsg) renderEnd(S.endMsg, true); break;
     case 'kick': S.ended = true; session.del(KEY); renderMessage(pose('oops'), 'You were removed from the game', 'Ask your teacher if that was a mistake.'); break;
     case 'bye': S.ended = true; session.del(KEY); renderMessage(pose('cheer'), 'The game has ended', 'Thanks for playing!'); break;
     default: break;
@@ -255,7 +261,7 @@ function renderRaceQ() {
     return 'dim';
   };
   setScreen('screen player question race', html`
-    ${header(html`<span class="chip">${icon('coin')} ${score}</span><span class="clock" id="rclock"></span>`)}
+    ${header(html`<span class="chip">${icon('coin')} <span id="mycoins">${score}</span></span><span class="clock" id="rclock"></span>`)}
     <div class="progress" aria-label="${done} of ${m.total} done"><i style="width:${pct}%"></i><span>${done} / ${m.total}</span></div>
     <h1 class="pq">${m.text}</h1>
     <div class="popts">${m.options.map((o, i) => optButton(o, i, state(i), S.rpick != null || fb ? 'disabled' : ''))}</div>
@@ -271,7 +277,7 @@ function renderRaceQ() {
   if (fb) { if (fb.ok) sfx.correct(); else sfx.wrong(); }
   if (fb && fb.ok) {
     const me = S;
-    S.timers.push(setTimeout(() => { if (S === me && S.rfb === fb) actions['p-next'](); }, 900));
+    S.timers.push(setTimeout(() => { if (S === me && S.rfb === fb) { if (fb.gate) renderGate(fb.s); else actions['p-next'](); } }, 900));
   }
 }
 
@@ -284,6 +290,86 @@ actions['p-next'] = () => {
     setScreen('screen player center', html`<div class="loading">${mascot('bob')}</div>`);
   }
 };
+
+// ----- Treasure Gates -----
+function renderGate(serial) {
+  S.timers.forEach(clearInterval); S.timers = [];
+  S.gate = { s: serial, picked: false };
+  setScreen('screen player v-gate', html`
+    ${header(html`<span class="chip">${icon('coin')} <span id="mycoins">${S.coins}</span></span>`)}
+    <main class="center-col">
+      <h1>Pick a gate!</h1>
+      <p class="lead">Treasure, a shield, or a sneaky surprise is waiting.</p>
+      <div class="gates">${[0, 1, 2].map((g) => html`
+        <button class="gate gate-${g}" data-action="p-gate" data-g="${g}" aria-label="Gate ${g + 1}"><b>?</b><span class="knob"></span></button>`)}
+      </div>
+    </main>`);
+}
+
+actions['p-gate'] = ({ g }) => {
+  if (!S || !S.gate || S.gate.picked) return;
+  S.gate.picked = true;
+  document.querySelectorAll('.gate').forEach((el) => { el.classList.toggle('picked', el.dataset.g === g); el.disabled = true; });
+  S.transport.send({ t: 'gp', s: S.gate.s, g: Number(g) });
+  sfx.click();
+};
+
+const PRIZES = {
+  coins: (m) => ({ visual: icon('coin'), title: 'Coin pile!', text: m.nobody ? `Nobody to steal from, so you found a coin pile! +${m.amount} coins` : `+${m.amount} coins` }),
+  jackpot: (m) => ({ visual: icon('trophy'), title: 'JACKPOT!', text: `+${m.amount} coins!` }),
+  double: () => ({ visual: raw('<div class="x2-burst">x2</div>'), title: 'Double up!', text: 'Your next right answer earns double coins.' }),
+  shield: () => ({ visual: icon('shield'), title: 'Shield!', text: 'It blocks the next steal against you.' }),
+  steal: (m) => ({ visual: icon('mask'), title: 'STEAL!', text: `You took ${m.amount} coins from ${m.victim}!` }),
+  blocked: (m) => ({ visual: icon('shield'), title: 'Blocked!', text: `${m.victim}'s shield stopped your steal. Here are ${m.amount} coins for trying.` }),
+};
+
+function renderPrize(m) {
+  S.timers.forEach(clearInterval); S.timers = [];
+  const before = S.coins;
+  S.coins = m.coins;
+  const info = (PRIZES[m.kind] || PRIZES.coins)(m);
+  setScreen(`screen player result prize prize-${m.kind}`, html`
+    ${header(html`<span class="chip">${icon('coin')} <span id="mycoins">${before}</span></span>`)}
+    <main class="center-col">
+      <div class="prize-icon pop">${info.visual}</div>
+      <h1>${info.title}</h1>
+      <p class="lead">${info.text}</p>
+      <button class="btn btn-sky" data-action="p-keep">Keep going</button>
+    </main>`);
+  countUp(byId('mycoins'), m.coins, { from: before, ms: 900, delay: 300 });
+  if (m.kind === 'steal') sfx.steal();
+  else if (m.kind === 'jackpot') { sfx.jackpot(); confetti(2500); }
+  else if (m.kind === 'blocked') sfx.wrong();
+  else sfx.coin();
+  const me = S;
+  S.timers.push(setTimeout(() => { if (S === me) actions['p-keep'](); }, 3200));
+}
+
+actions['p-keep'] = () => {
+  if (!S || !S.gate) return;
+  S.timers.forEach(clearInterval); S.timers = [];
+  S.gate = null; S.rfb = null; S.rq = null;
+  S.transport.send({ t: 'rn' });
+  setScreen('screen player center', html`<div class="loading">${mascot('bob')}</div>`);
+};
+
+// Someone stole from you (or a shield saved you).
+function onEvent(m) {
+  const before = S.coins;
+  S.coins = m.coins;
+  const el = byId('mycoins');
+  if (el) countUp(el, m.coins, { from: before, ms: 600 });
+  document.querySelectorAll('.banner').forEach((x) => x.remove());
+  const b = document.createElement('div');
+  b.className = `banner ${m.kind}`;
+  b.setAttribute('role', 'alert');
+  b.innerHTML = (m.kind === 'stolen'
+    ? html`${icon('mask')}<span><b>${m.who}</b> stole <b>${m.n}</b> coins from you!</span>`
+    : html`${icon('shield')}<span>Your shield blocked <b>${m.who}</b>!</span>`).__raw;
+  document.body.appendChild(b);
+  setTimeout(() => b.remove(), 4200);
+  if (m.kind === 'stolen') sfx.steal(); else sfx.correct();
+}
 
 function renderRaceDone(m) {
   S.timers.forEach(clearInterval); S.timers = [];
@@ -300,7 +386,7 @@ function renderRaceDone(m) {
   sfx.win();
 }
 
-function renderEnd(m) {
+function renderEnd(m, quiet = false) {
   S.timers.forEach(clearInterval); S.timers = [];
   const medal = m.rank >= 1 && m.rank <= 3 ? medalImg(m.rank) : pose('cheer');
   const title = m.rank === 1 ? 'You won!' : m.rank <= 3 ? 'You made the podium!' : 'Great job!';
@@ -311,13 +397,32 @@ function renderEnd(m) {
       <h1>${title}</h1>
       <p class="lead">You finished <b>#${m.rank}</b> of ${m.of}</p>
       <div class="stats">
-        <div><span>Score</span><b>${m.score}</b></div>
-        <div><span>Correct</span><b>${m.correct}/${m.total}</b></div>
+        ${m.mode === 'live'
+          ? html`<div><span>Score</span><b>${m.score}</b></div><div><span>Correct</span><b>${m.correct}/${m.total}</b></div>`
+          : html`<div><span>Coins</span><b>${m.score}</b></div><div><span>Right answers</span><b>${m.correct}</b></div>`}
       </div>
       <button class="btn btn-sky" data-action="p-home">Back to home</button>
     </main>`);
-  if (m.rank <= 3) { confetti(); sfx.win(); }
+  if (m.rank <= 3 && !quiet) { confetti(); sfx.win(); }
 }
+
+// ----- Story Time (read along with the big screen) -----
+function renderStoryPage(m) {
+  S.timers.forEach(clearInterval); S.timers = [];
+  setScreen('screen player v-story-p', html`
+    ${header(html`<span class="chip">${icon('book')} ${m.i + 1} / ${m.n}</span>`)}
+    <main class="story-read">
+      <h2 class="story-title-p">${m.title}</h2>
+      ${m.detective
+        ? html`<section class="story-text detective"><h2>${icon('book')} Story Detective</h2><ol>${m.detective.map((q) => html`<li>${q}</li>`)}</ol></section>`
+        : html`<div class="cast cast-sm">${(m.cast || []).map((a) => avatarHtml(a))}</div><p class="story-text">${storyHtml(m.text)}</p>`}
+      ${canSpeak() ? html`<button class="btn btn-sky" data-action="p-read">Read to me</button>` : ''}
+    </main>`);
+}
+actions['p-read'] = () => {
+  if (!S || !S.story) return;
+  speak(S.story.detective ? 'Story Detective. ' + S.story.detective.join(' ') : S.story.text);
+};
 
 actions['p-home'] = () => { leaveGame(); nav.home(); };
 actions['p-leave'] = () => { if (confirm('Leave this game?')) { leaveGame(); nav.home(); } };

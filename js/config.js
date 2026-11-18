@@ -23,6 +23,9 @@ export const PEER_OPTIONS = Object.assign({ debug: 0 }, window.QUIZ_PARTY_PEER_O
 //   tick       the last 5 seconds of a question
 //   win        the podium
 //   click      tapping an answer
+//   coin       finding coins behind a gate (Treasure Gates)
+//   steal      a steal (Treasure Gates)
+//   jackpot    finding the jackpot (Treasure Gates)
 export const SOUND_FILES = {
   // correct: 'assets/sounds/correct.mp3',
   // wrong: 'assets/sounds/wrong.mp3',

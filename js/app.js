@@ -174,12 +174,19 @@ function renderSetup(quiz) {
           <label class="modecard"><input type="radio" name="mode" value="race">
             <span class="modebody"><span class="modeicon">${icon('flag')}</span><b>Race</b>
             <span>Everyone plays at their own speed and races to the finish. Missed questions come back around.</span></span></label>
+          <label class="modecard"><input type="radio" name="mode" value="gates">
+            <span class="modebody"><span class="modeicon">${icon('mask')}</span><b>Treasure Gates</b>
+            <span>Every right answer opens a gate: coins, a shield, a jackpot, or a sneaky steal from a classmate.</span></span></label>
         </fieldset>
-        <label class="field" id="race-opts" hidden><span>Race length</span>
+        <label class="field" id="race-opts" hidden><span>How long should it last?</span>
           <select name="minutes">${[3, 5, 8, 10, 15].map((m) => html`<option value="${m}" ${m === 5 ? 'selected' : ''}>${m} minutes</option>`)}</select></label>
 
         <section class="card optcard">
           <h2>Your choices</h2>
+          <div id="gate-opts" hidden>
+            <label class="check"><input type="checkbox" name="steal" ${o.steal ? 'checked' : ''}>
+              <span>Allow stealing. Players can take some coins from a classmate who is ahead of them. A shield blocks it.</span></label>
+          </div>
           <label class="field"><span>Student names</span>
             <select name="names">
               <option value="own" ${sel('own', o.names)}>Students type their own nickname</option>
@@ -219,6 +226,7 @@ function readHostOptions(f) {
     delay: Number(f.elements.delay.value) || 5,
     shuffleQ: f.elements.shuffleQ.checked,
     shuffleA: f.elements.shuffleA.checked,
+    steal: f.elements.steal.checked,
   };
 }
 
@@ -249,8 +257,9 @@ app.addEventListener('submit', (e) => {
 
 app.addEventListener('change', (e) => {
   if (e.target.name === 'mode') {
-    byId('race-opts').hidden = e.target.value !== 'race';
-    byId('live-opts').hidden = e.target.value === 'race';
+    byId('race-opts').hidden = e.target.value === 'live';
+    byId('live-opts').hidden = e.target.value !== 'live';
+    byId('gate-opts').hidden = e.target.value !== 'gates';
   } else if (e.target.name === 'auto') byId('delay-row').hidden = !e.target.checked;
   else if (e.target.id === 'imp' && e.target.files[0]) { importFile(e.target.files[0]); e.target.value = ''; }
 });

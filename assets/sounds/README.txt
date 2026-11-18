@@ -14,5 +14,8 @@ The names you can use:
   tick       the last 5 seconds of a question
   win        the podium
   click      tapping an answer
+  coin       finding coins behind a gate (Treasure Gates)
+  steal      a steal (Treasure Gates)
+  jackpot    finding the jackpot (Treasure Gates)
 
 Only use sounds you made or have the right to use (check the license on any free sound site).

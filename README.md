@@ -14,6 +14,7 @@ about students. It can live for free on GitHub Pages.
 | --- | --- |
 | **Live Quiz** | Everyone answers the same question at the same time while the teacher's screen leads. Faster correct answers earn more points, and streaks add bonus points. Leaderboard after each question, podium at the end. |
 | **Race** | Everyone plays at their own speed and races to the finish line. Wrong answers come back around later, so kids get a second try. Coins for correct answers, streak bonuses, and bonuses for the first three to finish. |
+| **Treasure Gates** | Everyone plays at their own speed against the clock. Every right answer opens three hidden gates. Behind them: coins, a jackpot, a double-up, a shield, or a **steal** from a classmate. Most coins when time is up wins. |
 
 Also included: five starter ELA quizzes (grades 3 to 5), a quiz maker, import and export of quizzes,
 QR code joining, kick button, results download (CSV), and rejoin if a student refreshes the page.
@@ -34,6 +35,37 @@ QR code joining, kick button, results download (CSV), and rejoin if a student re
 
 **Keep the teacher's tab open.** The teacher's browser is the game server. If it is closed or
 refreshed, the game ends. A warning pops up if you try to leave mid game.
+
+## Treasure Gates
+
+Pick **Treasure Gates** on the setup screen and choose how long the game lasts. Questions keep coming
+(missed ones return), and each right answer earns 50 coins (plus a small streak bonus) and a pick of
+three gates:
+
+| Behind the gate | What happens |
+| --- | --- |
+| Coin pile | +100, +200 or +400 coins |
+| Jackpot | +1000 coins (rare) |
+| Double up | your next right answer earns double |
+| Shield | blocks the next steal against you |
+| Steal | take about a fifth of the coins (50 to 300) from a classmate who is ahead of you |
+
+Stealing stays fair: you can only steal from someone who is ahead of you and has at least 100 coins,
+they always keep some coins, and a shield blocks it (the thief gets 50 coins for trying). If nobody is
+ahead of you, a "steal" turns into a coin pile. The teacher can switch stealing off for a class. All the
+prizes are decided on the teacher's computer, so students can not peek or cheat. The big screen shows a
+live coin board and a "What just happened" feed.
+
+## Story Time Finale
+
+After the podium, tap **Story time!**. The game writes a short, silly story starring the class: the
+winner is the hero, and the other players and their buddies show up as characters. Names are
+highlighted, the big screen shows the story one page at a time, and every student device reads along.
+There is a **Read to us** button (the browser's built-in voice), and a last page of **Story Detective**
+questions about similes, metaphors, hyperbole and more. **Another story** picks a different plot. The
+stories come from templates in `js/story.js` (no AI and nothing is sent anywhere). Streaks and, in
+Treasure Gates, the biggest steal get a mention too. The podium also shows awards for the best streak
+and the master thief.
 
 ## Choices before you start
 
@@ -119,7 +151,7 @@ The picker grows to fit however many buddies you add.
 | What | Where | Used for |
 | --- | --- | --- |
 | Star mascot (4 poses) | `assets/mascot/` | home screen, and the result screens kids see (cheer, oops, waiting) |
-| Icons | `assets/icons/` | coins, streak flame, finish flag, trophy and more |
+| Icons | `assets/icons/` | coins, streak flame, finish flag, trophy, shield, bandit mask and more |
 | Medals | `assets/medals/` | the podium and the end screen |
 | Background pattern | `assets/pattern.png` | the faint doodles behind every screen |
 | Arcade scene | `assets/hero.png` | the picture at the top of the home screen (three random buddies stand in it) |
@@ -145,7 +177,8 @@ student. This works without the internet connection to the broker.
 index.html          the page
 css/style.css       all styling (Ms. Gamification brand colors, Poppins font)
 js/app.js           home, join, quiz library, game setup
-js/host.js          the teacher's game screens and scoring
+js/host.js          the teacher's game screens, scoring and Treasure Gates
+js/story.js         the Story Time Finale story maker
 js/player.js        the student's screens
 js/editor.js        the quiz maker
 js/quizzes.js       starter quizzes and quiz checking

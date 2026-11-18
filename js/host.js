@@ -6,6 +6,7 @@ import {
   AVATARS, avatarHtml, avatarName, icon, pose, medalImg, uid, mmss, downloadFile, csvCell, isMuted, setSoundRole, countUp,
 } from './util.js';
 import { openHost, friendlyError } from './transport.js';
+import { buildStory, storyHtml, plainText, speak, canSpeak, stopSpeaking } from './story.js';
 import { MAX_PLAYERS } from './config.js';
 
 let G = null; // the current game, or null
@@ -27,6 +28,7 @@ export const DEFAULT_OPTS = {
   delay: 5,              // seconds to stay on each screen when auto-play is on
   shuffleQ: false,       // mix up the question order
   shuffleA: false,       // mix up the answer order
+  steal: true,           // Treasure Gates: allow stealing coins from classmates
 };
 
 const ADJECTIVES = ['Happy', 'Brave', 'Sparkly', 'Zippy', 'Cosmic', 'Jolly', 'Cozy', 'Mighty', 'Clever', 'Bouncy',
@@ -58,7 +60,7 @@ function prepareQuiz(quiz, o) {
   return { ...quiz, questions: qs };
 }
 const prettyPin = (pin) => pin.slice(0, 3) + ' ' + pin.slice(3);
-const MODE_LABEL = { live: 'Live Quiz', race: 'Race' };
+const MODE_LABEL = { live: 'Live Quiz', race: 'Race', gates: 'Treasure Gates' };
 
 function ranked() {
   const l = list().sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name));
@@ -107,7 +109,8 @@ export async function hostGame({ quiz, mode, local, minutes, opts }) {
     autoTimer: 0, autoTick: 0, autoPaused: false,
     players: new Map(), conns: new Map(), phase: 'lobby',
     qi: -1, answers: new Map(), qStart: 0, limit: 20, counts: [], ticker: 0, allTimer: 0,
-    finishCount: 0, raceEnd: 0,
+    finishCount: 0, raceEnd: 0, feed: [], feedId: 0, gatesTimer: 0, bigSteal: null,
+    story: null, storyPage: 0, storyOn: false,
   };
   transport.onMessage = onMessage;
   transport.onClose = onClose;
@@ -118,7 +121,7 @@ export async function hostGame({ quiz, mode, local, minutes, opts }) {
 
 export function stopHosting() {
   if (!G) return;
-  clearInterval(G.ticker); clearTimeout(G.allTimer); clearAuto();
+  clearInterval(G.ticker); clearTimeout(G.allTimer); clearTimeout(G.gatesTimer); clearAuto();
   list().forEach((p) => p.race && clearTimeout(p.race.timer));
   try { G.transport.broadcast({ t: 'bye' }); } catch { /* ignore */ }
   const t = G.transport;
@@ -137,6 +140,7 @@ function onMessage(conn, m) {
   if (m.t === 'a') onAnswer(p, m);
   else if (m.t === 'ra') onRaceAnswer(p, m);
   else if (m.t === 'rn') onRaceNext(p);
+  else if (m.t === 'gp') onGatePick(p, m);
 }
 
 function onClose(conn) {
@@ -174,6 +178,7 @@ function onJoin(conn, m) {
     p = {
       pid: uid(), name: random ? randomName(avatar) : typed, avatar,
       conn, connected: true, score: 0, streak: 0, correct: 0, last: null, rank: 0, prevRank: 0, delta: 0, race: null,
+      bestStreak: 0, steals: 0, stoleCoins: 0, double: false, shield: false,
     };
     G.players.set(p.pid, p);
   }
@@ -198,7 +203,7 @@ function snapshot(p) {
       break;
     case 'countdown': send(p, { t: 'cd' }); break;
     case 'race': startRaceFor(p); break;
-    case 'end': send(p, endMsg(p)); break;
+    case 'end': send(p, endMsg(p)); if (G.storyOn) send(p, storyMsg()); break;
     default: break;
   }
 }
@@ -207,7 +212,7 @@ function rosterChanged() {
   if (!G) return;
   if (G.phase === 'lobby') updateLobby();
   else if (G.phase === 'question') { updateAnswered(); checkAllAnswered(); }
-  else if (G.phase === 'race') { list().forEach(updateLane); checkRaceOver(); }
+  else if (G.phase === 'race') { list().forEach(updateLane); scheduleGates(); checkRaceOver(); }
 }
 
 // ---------- Lobby ----------
@@ -297,7 +302,7 @@ function beginCountdown() {
     if (!G || G.phase !== 'countdown') { clearInterval(G && G.ticker); return; }
     if (n > 0) { show(); return; }
     clearInterval(G.ticker);
-    if (G.mode === 'race') startRace(); else startQuestion(0);
+    if (G.mode === 'live') startQuestion(0); else startRace();
   }, 1000);
 }
 
@@ -360,7 +365,7 @@ function endQuestion() {
     const a = G.answers.get(p.pid);
     if (a) counts[a.c]++;
     if (a && a.c === q.correct) {
-      p.streak++; p.correct++;
+      p.streak++; p.correct++; p.bestStreak = Math.max(p.bestStreak, p.streak);
       const base = Math.round(1000 * (1 - (a.t / q.time) / 2));
       const bonus = Math.min(p.streak - 1, 5) * 100;
       p.score += base + bonus;
@@ -530,20 +535,24 @@ function startRace() {
   G.finishCount = 0;
   list().forEach(initRace);
   connected().forEach(startRaceFor);
-  renderRace();
+  if (G.mode === 'gates') renderGates(); else renderRace();
   G.ticker = setInterval(raceTick, 250);
   sfx.start();
 }
 
 function startRaceFor(p) {
   initRace(p);
-  send(p, { t: 'rs', total: nQ(), secs: Math.max(0, Math.round((G.raceEnd - Date.now()) / 1000)) });
-  if (p.race.done) send(p, finishMsg(p)); else sendRaceQ(p);
+  send(p, { t: 'rs', mode: G.mode, total: nQ(), secs: Math.max(0, Math.round((G.raceEnd - Date.now()) / 1000)) });
+  const cur = p.race.cur;
+  if (G.mode === 'gates' && cur && cur.gateOpen && !cur.gatePicked) send(p, { t: 'gate', s: cur.s, coins: p.score }); // they still owe a gate pick
+  else if (p.race.done) send(p, finishMsg(p));
+  else sendRaceQ(p);
 }
 
 function sendRaceQ(p) {
   const r = p.race;
   if (!G || G.phase !== 'race' || !r || !p.connected) return;
+  if (!r.queue.length) r.queue = shuffle(G.quiz.questions.map((_, i) => i));
   const qi = r.queue[0];
   const q = G.quiz.questions[qi];
   const order = shuffle(q.options.map((_, i) => i));
@@ -568,9 +577,16 @@ function onRaceAnswer(p, m) {
   const ok = cur.order[m.c] === q.correct;
   let gain = 0; let bonus = 0;
   if (ok) {
-    r.queue.shift(); r.correct++; p.correct++; p.streak++;
-    gain = 100 + Math.min(p.streak - 1, 5) * 20;
-    if (!r.queue.length) { r.done = true; r.place = ++G.finishCount; bonus = [0, 300, 200, 100][r.place] || 0; }
+    r.queue.shift(); r.correct++; p.correct++; p.streak++; p.bestStreak = Math.max(p.bestStreak, p.streak);
+    if (G.mode === 'gates') {
+      gain = 50 + Math.min(p.streak - 1, 5) * 10;
+      cur.doubled = p.double;
+      if (p.double) { gain *= 2; p.double = false; }
+      cur.gateOpen = true; // they now get to pick a gate
+    } else {
+      gain = 100 + Math.min(p.streak - 1, 5) * 20;
+      if (!r.queue.length) { r.done = true; r.place = ++G.finishCount; bonus = [0, 300, 200, 100][r.place] || 0; }
+    }
     p.score += gain + bonus;
   } else {
     p.streak = 0;
@@ -580,8 +596,9 @@ function onRaceAnswer(p, m) {
   send(p, {
     t: 'rr', s: cur.s, ok, correct: cur.order.indexOf(q.correct), gain, bonus,
     score: p.score, streak: p.streak, done: r.correct, total: nQ(), finished: r.done, place: r.place,
+    gate: G.mode === 'gates' && ok, doubled: !!cur.doubled,
   });
-  updateLane(p);
+  updateLane(p); scheduleGates();
   if (r.done) { sfx.correct(); checkRaceOver(); }
 }
 
@@ -590,6 +607,7 @@ function onRaceNext(p) {
   if (!r || G.phase !== 'race') return;
   if (r.done) return send(p, finishMsg(p));
   if (r.cur && !r.cur.answered) return;
+  if (r.cur && r.cur.gateOpen && !r.cur.gatePicked) return; // pick a gate first
   clearTimeout(r.timer);
   r.timer = setTimeout(() => sendRaceQ(p), Math.max(0, r.nextAt - Date.now()));
 }
@@ -649,6 +667,146 @@ function updateLane(p) {
   el.querySelector('.fire').innerHTML = (r && r.done ? html`${icon('flag')} #${r.place}` : p.streak >= 3 ? html`${icon('flame')}${p.streak}` : html``).__raw;
 }
 
+// ---------- Treasure Gates ----------
+// After every right answer a player picks one of three hidden gates. Everything about what is
+// behind the gates is decided here, so a student device can never peek or cheat.
+const GATE_TABLE = [
+  { kind: 'coins', amount: 100, w: 22 },
+  { kind: 'coins', amount: 200, w: 14 },
+  { kind: 'coins', amount: 400, w: 6 },
+  { kind: 'jackpot', amount: 1000, w: 2 },
+  { kind: 'double', w: 10 },
+  { kind: 'shield', w: 10 },
+  { kind: 'steal', w: 24 },
+];
+
+function drawGate() {
+  const table = G.opts.steal ? GATE_TABLE : GATE_TABLE.filter((g) => g.kind !== 'steal');
+  const forced = window.__forceGateKind; // only the automatic tests set this
+  if (forced) return table.find((g) => g.kind === forced) || table[0];
+  let x = Math.random() * table.reduce((n, g) => n + g.w, 0);
+  for (const g of table) { x -= g.w; if (x < 0) return g; }
+  return table[0];
+}
+
+// A steal takes about a fifth of the victim's coins (50 to 300) and always leaves them some.
+const stealAmount = (v) => Math.max(1, Math.min(300, Math.max(50, Math.round(v.score * 0.2 / 10) * 10), v.score - 25));
+// You can only steal from someone who is ahead of you and has at least 100 coins.
+function pickVictim(thief) {
+  const c = connected().filter((x) => x !== thief && x.race && x.score >= 100 && x.score > thief.score);
+  return c.length ? c[Math.floor(Math.random() * c.length)] : null;
+}
+
+function feedAdd(kind, text) {
+  G.feed.unshift({ id: ++G.feedId, kind, text });
+  if (G.feed.length > 7) G.feed.length = 7;
+}
+
+function onGatePick(p, m) {
+  const r = p.race;
+  const cur = r && r.cur;
+  if (G.mode !== 'gates' || G.phase !== 'race' || !cur || m.s !== cur.s || !cur.gateOpen || cur.gatePicked) return;
+  if (!Number.isInteger(m.g) || m.g < 0 || m.g > 2) return;
+  cur.gatePicked = true;
+  const out = drawGate();
+  const mult = cur.doubled ? 2 : 1;
+  let res = { kind: out.kind };
+  if (out.kind === 'coins' || out.kind === 'jackpot') {
+    const n = out.amount * mult;
+    p.score += n; res.amount = n;
+    if (out.kind === 'jackpot') { feedAdd('jackpot', `${p.name} found the JACKPOT! +${n} coins`); sfx.jackpot(); } else sfx.coin();
+  } else if (out.kind === 'double') {
+    p.double = true;
+  } else if (out.kind === 'shield') {
+    p.shield = true;
+  } else if (out.kind === 'steal') {
+    const v = pickVictim(p);
+    if (!v) {                      // nobody ahead of you to steal from
+      p.score += 150; res = { kind: 'coins', amount: 150, nobody: true };
+    } else if (v.shield) {         // their shield soaks it up
+      v.shield = false; p.score += 50;
+      res = { kind: 'blocked', amount: 50, victim: v.name };
+      send(v, { t: 'ev', kind: 'blocked', who: p.name, coins: v.score });
+      feedAdd('block', `${v.name}'s shield blocked ${p.name}!`);
+    } else {
+      const n = stealAmount(v);
+      v.score -= n; p.score += n; p.steals++; p.stoleCoins += n;
+      res = { kind: 'steal', amount: n, victim: v.name };
+      send(v, { t: 'ev', kind: 'stolen', who: p.name, n, coins: v.score });
+      feedAdd('steal', `${p.name} stole ${n} coins from ${v.name}!`);
+      if (!G.bigSteal || n > G.bigSteal.n) G.bigSteal = { thief: p.name, victim: v.name, n };
+      sfx.steal();
+    }
+  }
+  r.nextAt = Date.now() + 1200;
+  send(p, { t: 'gr', s: cur.s, g: m.g, ...res, coins: p.score, shield: p.shield, double: p.double });
+  scheduleGates(true);
+}
+
+function renderGates() {
+  setScreen('screen host v-gates', html`
+    <header class="topbar">
+      <div class="chip">${G.quiz.emoji} ${G.quiz.title} <span class="chip-sub">Treasure Gates</span></div>
+      <div class="clock" id="clock">${mmss(G.minutes * 60)}</div>
+      <button class="btn btn-ghost" data-action="h-end">End now</button>
+    </header>
+    <main class="gates-main">
+      <section class="gboard-wrap">
+        <div class="gboard" id="gboard" aria-label="Coins so far"></div>
+        <p class="hint" id="gmore"></p>
+      </section>
+      <section class="feed card">
+        <h2>${icon(G.opts.steal ? 'mask' : 'coin')} What just happened</h2>
+        <ol id="feed-list"></ol>
+      </section>
+    </main>`);
+  updateGates();
+}
+
+// Redraw the coin board (at most every 350 ms so a busy class does not make it jitter).
+function scheduleGates(feedChanged) {
+  if (!G || G.mode !== 'gates' || G.phase !== 'race' || G.gatesTimer) return;
+  G.gatesTimer = setTimeout(() => { if (!G) return; G.gatesTimer = 0; updateGates(); }, feedChanged ? 120 : 350);
+}
+
+function updateGates() {
+  const board = byId('gboard');
+  if (!board || !G || G.mode !== 'gates') return;
+  const all = ranked();
+  const top = all.slice(0, 10);
+  const have = new Map([...board.children].map((e) => [e.dataset.pid, e]));
+  top.forEach((p, i) => {
+    let el = have.get(p.pid);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'grow'; el.dataset.pid = p.pid;
+      el.innerHTML = html`<span class="rank"></span><span class="av">${avatarHtml(p.avatar)}</span><span class="nm">${p.name}</span>
+        <span class="badges"></span><b class="coins">${icon('coin')}<span class="cn">0</span></b>`.__raw;
+      board.appendChild(el);
+    }
+    have.delete(p.pid);
+    el.style.setProperty('--i', i);
+    el.querySelector('.rank').textContent = i + 1;
+    el.classList.toggle('off', !p.connected);
+    const cn = el.querySelector('.cn');
+    const prev = Number(cn.dataset.v || 0);
+    if (prev !== p.score) {
+      countUp(cn, p.score, { from: prev, ms: 500 });
+      cn.dataset.v = p.score;
+      el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+    }
+    el.querySelector('.badges').innerHTML = html`${p.shield ? icon('shield') : ''}${p.double ? html`<span class="x2">x2</span>` : ''}${p.streak >= 3 ? html`<span class="sk">${icon('flame')}${p.streak}</span>` : ''}`.__raw;
+  });
+  have.forEach((e) => e.remove()); // anyone who dropped out of the top 10
+  board.style.setProperty('--n', Math.max(1, top.length));
+  byId('gmore').textContent = all.length > 10 ? `and ${all.length - 10} more playing` : '';
+  const kindIcon = { steal: 'mask', block: 'shield', jackpot: 'trophy' };
+  const shown = Number(board.dataset.feed || 0);
+  byId('feed-list').innerHTML = (G.feed.length ? G.feed : [{ id: 0, kind: 'info', text: 'The gates are open! Answer questions to find treasure.' }]).map((f) => html`
+    <li class="fi ${f.kind} ${f.id > shown ? 'new' : ''}">${icon(kindIcon[f.kind] || 'coin')}<span>${f.text}</span></li>`.__raw).join('');
+  board.dataset.feed = G.feedId;
+}
+
 // ---------- The end ----------
 function endMsg(p) {
   return { t: 'end', rank: p.rank, of: G.players.size, score: p.score, correct: p.correct, total: nQ(), mode: G.mode };
@@ -662,7 +820,16 @@ function finishGame() {
   renderPodium(l);
 }
 
-function renderPodium(l) {
+function awardsFor(l) {
+  const out = [];
+  const streak = l.slice().sort((a, b) => b.bestStreak - a.bestStreak)[0];
+  if (streak && streak.bestStreak >= 3) out.push({ icon: 'flame', text: `Best streak: ${streak.name} (${streak.bestStreak} right in a row)` });
+  const thief = l.slice().sort((a, b) => b.stoleCoins - a.stoleCoins)[0];
+  if (G.mode === 'gates' && thief && thief.stoleCoins > 0) out.push({ icon: 'mask', text: `Master thief: ${thief.name} (${thief.stoleCoins} coins stolen)` });
+  return out;
+}
+
+function renderPodium(l, quiet = false) {
   const [a, b, c] = l;
   const spot = (p, place) => (p ? html`
     <div class="spot spot-${place}">
@@ -673,20 +840,98 @@ function renderPodium(l) {
     <header class="topbar">
       <div class="chip">${G.quiz.emoji} ${G.quiz.title}</div>
       <div class="row">
+        ${l.length ? html`<button class="btn btn-pink" data-action="h-story">${icon('book')} Story time!</button>` : ''}
         <button class="btn btn-sky" data-action="h-csv">Download results</button>
-        <button class="btn btn-pink" data-action="h-exit">Finish</button>
+        <button class="btn" data-action="h-exit">Finish</button>
       </div>
     </header>
     <main class="podium-main">
       <h1>${l.length ? 'Great game!' : 'Game over'}</h1>
       <div class="podium">${spot(b, 2)}${spot(a, 1)}${spot(c, 3)}</div>
+      ${awardsFor(l).length ? html`<ul class="awards">${awardsFor(l).map((w) => html`<li>${icon(w.icon)}<span>${w.text}</span></li>`)}</ul>` : ''}
       ${l.length > 3 ? html`
         <ol class="rest" start="4">${l.slice(3).map((p) => html`
           <li><span class="av">${avatarHtml(p.avatar)}</span><span class="nm">${p.name}</span><b>${p.score}</b></li>`)}
         </ol>` : ''}
     </main>`);
-  if (l.length) { confetti(); sfx.win(); }
+  if (l.length && !quiet) { confetti(); sfx.win(); }
 }
+
+// ---------- Story Time Finale ----------
+function storyMsg() {
+  const st = G.story; const i = G.storyPage; const n = st.pages.length;
+  if (i >= n) return { t: 'sp', i, n: n + 1, title: st.title, detective: st.detective, text: '', cast: [] };
+  return { t: 'sp', i, n: n + 1, title: st.title, text: st.pages[i].text, cast: st.pages[i].cast.map((p) => p.avatar) };
+}
+
+function storyOptions() { return { mode: G.mode, bigSteal: G.bigSteal, avoid: G.story ? G.story.plot : undefined }; }
+
+actions['h-story'] = () => {
+  if (!G || G.phase !== 'end' || !list().length) return;
+  if (!G.story) G.story = buildStory(ranked(), storyOptions());
+  G.storyPage = 0; G.storyOn = true;
+  renderStory();
+};
+actions['h-story-again'] = () => {
+  if (!G || !G.story) return;
+  stopSpeaking();
+  G.story = buildStory(ranked(), storyOptions());
+  G.storyPage = 0;
+  renderStory();
+};
+actions['h-story-go'] = ({ d }) => {
+  if (!G || !G.storyOn) return;
+  stopSpeaking();
+  G.storyPage = Math.max(0, Math.min(G.story.pages.length, G.storyPage + Number(d)));
+  renderStory();
+};
+actions['h-story-read'] = () => {
+  if (!G || !G.story) return;
+  const m = storyMsg();
+  speak(m.detective ? 'Story Detective. ' + m.detective.join(' ') : m.text);
+};
+actions['h-story-done'] = () => {
+  if (!G) return;
+  stopSpeaking();
+  G.storyOn = false;
+  connected().forEach((p) => send(p, { t: 'sx' }));
+  renderPodium(ranked(), true);
+};
+
+function renderStory() {
+  const st = G.story; const i = G.storyPage; const n = st.pages.length;
+  const onDetective = i >= n;
+  const page = onDetective ? null : st.pages[i];
+  setScreen('screen host v-story', html`
+    <header class="topbar">
+      <button class="btn btn-ghost" data-action="h-story-done">&larr; Back to podium</button>
+      <div class="chip">${icon('book')} Story time</div>
+      <div class="row">
+        <button class="btn btn-ghost" data-action="h-story-again">Another story</button>
+        ${canSpeak() ? html`<button class="btn btn-sky" data-action="h-story-read">Read to us</button>` : ''}
+      </div>
+    </header>
+    <main class="story-main">
+      <h1 class="story-title">${st.title}</h1>
+      ${onDetective
+        ? html`<section class="story-text detective"><h2>${icon('book')} Story Detective</h2><ol>${st.detective.map((q) => html`<li>${q}</li>`)}</ol></section>`
+        : html`<div class="cast">${page.cast.map((p) => html`<div class="cm">${avatarHtml(p.avatar)}<span>${p.name}</span></div>`)}</div>
+               <p class="story-text">${storyHtml(page.text)}</p>`}
+      <div class="story-nav">
+        <button class="btn" data-action="h-story-go" data-d="-1" ${i === 0 ? 'disabled' : ''}>&larr; Back</button>
+        <span class="story-count">${i + 1} of ${n + 1}</span>
+        ${i < n ? html`<button class="btn btn-pink" data-action="h-story-go" data-d="1">${i === n - 1 ? 'Story Detective' : 'Next'} &rarr;</button>`
+                : html`<button class="btn btn-pink" data-action="h-story-done">Back to podium</button>`}
+      </div>
+    </main>`);
+  connected().forEach((p) => send(p, storyMsg()));
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!G || !G.storyOn || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return;
+  if (e.target.closest && e.target.closest('input, select, textarea')) return;
+  actions['h-story-go']({ d: e.key === 'ArrowRight' ? 1 : -1 });
+});
 
 actions['h-csv'] = () => {
   if (!G) return;

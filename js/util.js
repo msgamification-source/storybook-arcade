@@ -113,7 +113,7 @@ export const shapeIcon = (i) =>
 
 // ---------- Star mascot, icons and medals (pictures in assets/) ----------
 const POSES = ['stand', 'cheer', 'oops', 'wait'];
-const ICONS = ['coin', 'flame', 'flag', 'trophy', 'heart', 'joystick', 'controller', 'book', 'pencil', 'bookmark'];
+const ICONS = ['coin', 'flame', 'flag', 'trophy', 'heart', 'joystick', 'controller', 'book', 'pencil', 'bookmark', 'shield', 'mask'];
 const MEDALS = ['gold', 'silver', 'bronze'];
 const pic = (src, cls) => raw(`<img class="${cls}" src="${src}" alt="" draggable="false">`);
 
@@ -182,6 +182,9 @@ export const sfx = {
   tick: sound('tick', () => { tone(900, 0, 0.05, 'square', 0.03); }),
   win: sound('win', () => { [523, 659, 784, 1046].forEach((f, i) => tone(f, i * 0.12, 0.25)); }),
   click: sound('click', () => { tone(720, 0, 0.05, 'sine', 0.08); }),
+  coin: sound('coin', () => { tone(988, 0, 0.07, 'square', 0.05); tone(1319, 0.07, 0.16, 'square', 0.05); }),
+  steal: sound('steal', () => { tone(520, 0, 0.09, 'sawtooth', 0.06); tone(390, 0.09, 0.09, 'sawtooth', 0.06); tone(260, 0.18, 0.24, 'sawtooth', 0.06); }),
+  jackpot: sound('jackpot', () => { [523, 659, 784, 1046, 1319].forEach((f, i) => tone(f, i * 0.08, 0.22)); }),
 };
 export const isMuted = () => muted;
 export function toggleMute() {
