@@ -8,8 +8,13 @@
 export const BUDDIES = [
   { id: 'fox', name: 'Fox' },
   { id: 'owl', name: 'Owl' },
-  { id: 'bear', name: 'Bear' },
+  { id: 'polarbear', name: 'Polar Bear' },
   { id: 'unicorn', name: 'Unicorn' },
   { id: 'narwhal', name: 'Narwhal' },
   { id: 'dragon', name: 'Dragon' },
+  { id: 'shark', name: 'Shark' },
+  { id: 'teddy', name: 'Teddy Bear' },
+  { id: 'eagle', name: 'Eagle' },
+  { id: 'gator', name: 'Gator' },
+  { id: 'axolotl', name: 'Axolotl' },
 ];
