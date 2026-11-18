@@ -1,0 +1,9 @@
+{
+  "name": "quiz-party-broker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tiny PeerJS broker for Quiz Party (optional).",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "peer": "^1.0.2" }
+}
