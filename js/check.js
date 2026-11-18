@@ -7,6 +7,7 @@
 // This runs a small test of each one on the device you are holding.
 
 import { PEER_OPTIONS } from './config.js';
+import { relayConfigured, testRelay } from './relay.js';
 
 const getPeer = () => window.Peer || (window.peerjs && window.peerjs.Peer);
 export const hasWebRTC = () => typeof RTCPeerConnection === 'function';
@@ -55,34 +56,48 @@ export function gather(policy, ms = 8000) {
 }
 
 // What the results mean, in words a teacher can act on.
-export function verdict({ broker, direct, relay }) {
+// hub: true or false if the reliable connection is set up, null if it is not.
+export function verdict({ broker, direct, relay, hub = null }) {
+  if (hub === true) {
+    return {
+      level: 'good',
+      title: 'The reliable connection works on this device.',
+      text: 'Games use this connection first. It only needs ordinary web access, so it should work on almost any school network.',
+    };
+  }
+  const tail = hub === false ? ' The reliable connection could not be reached from here either, so check that the database address in the settings is right.' : '';
   if (!broker) {
     return {
       level: 'bad',
       title: 'This device can not reach the connection service.',
-      text: 'The game needs a small free service to introduce devices to each other, and this network is blocking it or it is having a bad moment. Try another network (like a phone hotspot) or try again in a few minutes.',
+      text: 'The game needs a small free service to introduce devices to each other, and this network is blocking it or it is having a bad moment. Try another network (like a phone hotspot) or try again in a few minutes.' + tail,
     };
   }
   if (direct && relay) {
-    return { level: 'good', title: 'Everything works on this device.', text: 'Devices on this network should be able to join. If a student still cannot, run this check on their device too.' };
+    return { level: 'good', title: 'Direct connections should work here.', text: 'Devices on this network should be able to join. If a student still cannot, run this check on their device too.' + tail };
   }
   if (direct && !relay) {
     return {
       level: 'warn',
-      title: 'Devices on the same Wi-Fi will work. Devices on other networks might not.',
-      text: 'The backup relay is blocked here. A phone on cell data trying to reach a classroom computer needs that relay, so it may fail. Have everyone join from the same Wi-Fi as the teacher.',
+      title: 'Direct connections might work, but this network is limiting them.',
+      text: 'The backup route is blocked here. Devices on the same network may or may not be able to reach each other, because many school networks stop it. Devices on other networks (like cell data) probably will not. The reliable connection setup avoids this problem.' + tail,
     };
   }
   return {
     level: 'bad',
     title: 'This network blocks the kind of connection live games use.',
-    text: 'Only devices on the very same local network may be able to join each other, and some school networks block even that. Try a different network, like a phone hotspot, to see if it works there.',
+    text: 'Direct connections between devices will not work here, and some school networks block even devices on the same Wi-Fi. The reliable connection setup is the fix. You can also try a different network, like a phone hotspot.' + tail,
   };
 }
 
 // Runs everything. onStep(name, state) is called with 'run' and then 'ok' or 'bad'.
 export async function runCheck(onStep = () => {}) {
-  const out = { broker: false, direct: false, relay: false, webrtc: hasWebRTC() };
+  const out = { broker: false, direct: false, relay: false, hub: null, webrtc: hasWebRTC() };
+  if (relayConfigured()) {
+    onStep('hub', 'run');
+    out.hub = (await testRelay()) === 'ok';
+    onStep('hub', out.hub ? 'ok' : 'bad');
+  }
   onStep('broker', 'run'); out.broker = await testBroker(); onStep('broker', out.broker ? 'ok' : 'bad');
   onStep('direct', 'run'); const d = await gather('all'); out.direct = d.srflx; onStep('direct', out.direct ? 'ok' : 'bad');
   onStep('relay', 'run'); const r = await gather('relay'); out.relay = r.relay; onStep('relay', out.relay ? 'ok' : 'bad');

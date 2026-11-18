@@ -210,6 +210,60 @@ Names go in reading order (left to right, then top to bottom). Use `--same-scale
 for a set of poses of one character. To rebuild the background pattern from the icons, run
 `python3 tools/make-pattern.py`. All the tools need `pip install pillow numpy`.
 
+## The reliable connection (recommended for schools)
+
+By default, devices connect straight to each other (WebRTC, through PeerJS). **Many school networks block
+or break that**, even for two tabs on the same computer. The reliable connection avoids the problem: the
+game uses a free **Firebase Realtime Database** as a mailbox, and only needs ordinary web access (the same
+kind your browser uses for any website). Devices on school Wi-Fi, home Wi-Fi and cell data can all join the
+same game.
+
+**Set it up once (about 10 minutes, free):**
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) and sign in with a Google account.
+2. **Create a project** (any name, turn Google Analytics off).
+3. **Build, then Realtime Database, then Create Database.** Pick a location and **Start in locked mode**.
+4. On the **Rules** tab, replace everything with the rules below and **Publish**:
+
+```json
+{
+  "rules": {
+    "rooms": {
+      "$pin": {
+        ".read": true,
+        ".write": true,
+        "up": { "$k": { ".validate": "newData.isString() && newData.val().length < 6000" } },
+        "dn": { "$c": { "$k": { ".validate": "newData.isString() && newData.val().length < 6000" } } }
+      }
+    }
+  }
+}
+```
+
+5. On the **Data** tab, copy the address at the top (like `https://my-project-default-rtdb.firebaseio.com`) and
+   paste it into `RELAY_URL` in `js/config.js`.
+
+Once it is set, teachers' games use the reliable connection first and fall back to the direct connection if the
+database can not be reached. The lobby shows which one is in use, and the **connection check** has a step for it.
+
+**How it works:** the teacher's computer is still the game server. Each message is a small text note saved under
+`rooms/<PIN>`. Devices read their notes with a live stream (or by checking every second if the school blocks
+streaming), delete them once read, and the whole room is deleted when the game ends.
+
+**Good to know**
+
+- **Privacy:** while a game is running, student **nicknames, chosen buddies and answers** pass through Google's
+  Firebase servers. The messages are deleted as they are read and the room is deleted when the teacher finishes.
+  If the teacher's computer crashes mid game, a few leftover notes can stay in the database until you delete
+  the `rooms` node in the Firebase console. Nothing else about students is collected. Check that your district
+  allows this before using it with students.
+- **Limits:** the free plan allows about 100 devices connected at once (every student and the teacher each use
+  one), so a class of 30 is comfortable, and several classes at the same time can add up.
+- **Security:** the rules above let anyone who knows a PIN read and write that room. PINs are random and rooms
+  disappear when games end, which is fine for a classroom game but is not meant to protect secrets.
+- **Cost:** the free plan is plenty for classroom use. Firebase can show a Blaze plan upgrade offer. You do not
+  need it, and nothing here asks for a credit card.
+
 ## If a student can not join
 
 The game says what went wrong:
@@ -217,8 +271,8 @@ The game says what went wrong:
 - **"We could not find that game."** The PIN is wrong, or the teacher's game room is closed. Check the PIN
   on the big screen.
 - **"We found the game, but your device could not connect to it."** The student's device and the teacher's
-  computer can not reach each other. This usually happens when a student is on **cell data** (or a different
-  network) while the teacher's computer is on **school Wi-Fi**. Have the student join from the same Wi-Fi.
+  computer can not reach each other directly. This is common on school networks, and on cell data. Set up the
+  **reliable connection** above, which avoids the problem.
 - **"We could not reach the connection service."** The free service that introduces devices to each other
   is blocked or down. Try another network, or try again in a few minutes.
 
@@ -226,9 +280,8 @@ Every one of these offers a **connection check** (also at the bottom of the home
 connection service, a direct path, and the backup relay on that device, and explains the result in plain
 words. Run it on a student's device and on the classroom computer to see where the problem is.
 
-**Most reliable setup:** the teacher's computer and the students' devices all on the same school Wi-Fi.
-If your school blocks live connections, the next step is running your own relay (see `server/` and the
-notes above) or switching to a different connection service.
+**Most reliable setup:** turn on the reliable connection (above). Without it, live games depend on the school
+network allowing devices to reach each other directly, which many do not.
 
 ## Test without students
 
@@ -250,6 +303,7 @@ js/editor.js        the quiz maker
 js/quizzes.js       starter quizzes and quiz checking
 js/transport.js     PeerJS connection (and the same-device test mode)
 js/check.js         the connection check
+js/relay.js         the reliable connection (Firebase mailbox over ordinary web traffic)
 js/config.js        name, byline, player limit, custom sound files
 js/buddies.js       the list of character pictures
 assets/buddies/     the character pictures
@@ -270,10 +324,14 @@ To change the name shown on the home screen, edit `js/config.js`.
 
 ## Privacy
 
-Students type a nickname only. Nothing is sent to or stored on any server other than the
-temporary connection through the broker. Quizzes you make stay in your own browser.
-Fonts, the QR code library and PeerJS are bundled in this repository, so no student device loads
-anything from a third party website.
+Students type a nickname only. Quizzes you make stay in your own browser, and the Skills report is built on the
+teacher's computer and is not saved anywhere. Fonts, the QR code library and PeerJS are bundled in this
+repository, so no student device loads anything from a third party website.
+
+Live games need a connection service. With the **direct connection**, the free PeerJS service only helps devices
+find each other, and game messages go straight between devices. With the **reliable connection** (optional, see
+above), game messages, including nicknames, buddies and answers, pass briefly through your own Firebase database
+and are deleted when the game ends.
 
 ## Credits
 

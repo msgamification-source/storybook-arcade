@@ -245,6 +245,7 @@ function renderLobby() {
         <div class="pin" aria-label="Game PIN ${G.pin}">${prettyPin(G.pin)}</div>
         <div class="qr">${raw(qrSvg(url))}</div>
         <p class="hint">${G.local ? 'Test mode: open this site in another tab on this device to join.' : 'Or scan the code with a tablet or phone camera.'}</p>
+        <p class="route hint" title="How devices connect to this game">${G.transport.kind === 'relay' ? 'Connection: reliable (works on school networks)' : G.transport.kind === 'online' ? 'Connection: direct' : ''}</p>
       </section>
       <section class="players-panel">
         <div class="players-head">

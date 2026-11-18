@@ -11,6 +11,7 @@
 
 import { PEER_OPTIONS } from './config.js';
 import { uid } from './util.js';
+import { relayConfigured, relayHost, relayClient } from './relay.js';
 
 const PREFIX = 'storybookarcade-';
 const getPeer = () => window.Peer || (window.peerjs && window.peerjs.Peer);
@@ -24,8 +25,15 @@ export async function openHost({ local = false } = {}) {
   let last;
   for (let i = 0; i < 6; i++) {
     const pin = randomPin();
-    try { return local ? await localHost(pin) : await peerHost(pin); }
-    catch (e) { last = e; if (e.type !== 'unavailable-id') break; } // PIN already taken: try another
+    try {
+      if (local) return await localHost(pin);
+      if (relayConfigured()) {
+        // The reliable route first. If this computer can not reach it, fall back to the direct route.
+        try { return await relayHost(pin); }
+        catch (e) { if (e.type === 'unavailable-id') throw e; last = e; }
+      }
+      return await peerHost(pin);
+    } catch (e) { last = e; if (e.type !== 'unavailable-id') break; } // PIN already taken: try another
   }
   throw last || err('unknown');
 }
@@ -97,11 +105,18 @@ export async function connectToGame(pin) {
   if (window.BroadcastChannel) {
     try { return await localClient(pin); } catch { /* not a local game */ }
   }
+  let relayNotFound = false;
+  if (relayConfigured()) {
+    try { return await relayClient(pin); }
+    catch (e) { relayNotFound = e.type === 'peer-unavailable'; } // not there, or unreachable: try the direct route too
+  }
   try {
     return await peerClient(pin);
   } catch (e) {
     // A link that failed right away is often a one-off hiccup, so try once more.
     if (e.type === 'negotiation-failed') return peerClient(pin);
+    // The reliable route answered and said there is no such game, so a failure on the other route is just noise.
+    if (relayNotFound && errorKind(e) !== 'notfound') throw err('peer-unavailable');
     throw e;
   }
 }
@@ -177,7 +192,7 @@ export const errorKind = (e) => {
 export const friendlyError = (e) => {
   switch (errorKind(e)) {
     case 'notfound': return 'We could not find that game. Check the PIN. The teacher\'s game room has to be open.';
-    case 'link': return 'We found the game, but your device could not connect to it. Try joining on the same Wi-Fi as your teacher\'s computer.';
+    case 'link': return 'We found the game, but your device could not connect to it. Your school network may be blocking this kind of connection.';
     default:
       if (e && e.type === 'no-library') return 'Something did not load. Refresh the page and try again.';
       return 'We could not reach the connection service. Check your internet and try again.';

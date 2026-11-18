@@ -9,6 +9,7 @@ import { allQuizzes, findQuiz, copyOf, blankQuiz, deleteMine, normalizeQuiz, ups
 import { openEditor } from './editor.js';
 import { BOSSES } from './bosses.js';
 import { runCheck, hasWebRTC } from './check.js';
+import { relayConfigured } from './relay.js';
 import { hostGame, DEFAULT_OPTS } from './host.js';
 import { joinGame, resumeSession, leaveGame } from './player.js';
 
@@ -256,10 +257,11 @@ function readHostOptions(f) {
 actions['lib-play'] = ({ id }) => { const qz = findQuiz(id); if (qz) renderSetup(qz); };
 
 // ---------- Connection check ----------
-const CHECK_STEPS = [
+const checkSteps = () => [
+  ...(relayConfigured() ? [['hub', 'Reach the reliable connection', 'Works on almost any school network. Games use this first.']] : []),
   ['broker', 'Reach the connection service', 'The free service that introduces devices to each other.'],
-  ['direct', 'Find a direct path between devices', 'Works when devices are on the same Wi-Fi.'],
-  ['relay', 'Find the backup relay', 'Needed when devices are on different networks, like cell data and school Wi-Fi.'],
+  ['direct', 'Find a direct path between devices', 'Works on some networks when devices are close together.'],
+  ['relay', 'Find the backup route', 'Needed when devices are on different networks, like cell data and school Wi-Fi.'],
 ];
 const STATE_ICON = { wait: '⏳', run: '🔎', ok: '✅', bad: '❌' };
 let checking = false;
@@ -271,7 +273,7 @@ function renderCheck() {
       <h1>Connection check</h1>
       <p class="lead">Live games need a few things to work. This tests them on <b>this device</b>. Run it on a student's phone and on the classroom computer.</p>
       <ol class="checks card">
-        ${CHECK_STEPS.map(([id, title, why]) => html`
+        ${checkSteps().map(([id, title, why]) => html`
           <li id="ck-${id}"><span class="ck-i">${STATE_ICON.wait}</span><span><b>${title}</b><small>${why}</small></span></li>`)}
       </ol>
       <div id="ck-result" hidden></div>
@@ -293,7 +295,7 @@ actions['run-check'] = async () => {
   const btn = byId('ck-run');
   btn.disabled = true; btn.textContent = 'Checking...';
   byId('ck-result').hidden = true;
-  CHECK_STEPS.forEach(([id]) => { byId('ck-' + id).querySelector('.ck-i').textContent = STATE_ICON.wait; });
+  checkSteps().forEach(([id]) => { byId('ck-' + id).querySelector('.ck-i').textContent = STATE_ICON.wait; });
   const res = await runCheck((id, state) => { const el = byId('ck-' + id); if (el) el.querySelector('.ck-i').textContent = STATE_ICON[state]; });
   checking = false;
   const r = byId('ck-result');
@@ -301,7 +303,7 @@ actions['run-check'] = async () => {
   r.hidden = false;
   r.className = 'verdict ' + res.verdict.level;
   r.innerHTML = html`<b>${res.verdict.title}</b><p>${res.verdict.text}</p>
-    <p class="hint">Results: service ${res.broker ? 'ok' : 'blocked'}, direct path ${res.direct ? 'ok' : 'blocked'}, relay ${res.relay ? 'ok' : 'blocked'}.</p>`.__raw;
+    <p class="hint">Results: ${res.hub === null ? '' : `reliable connection ${res.hub ? 'ok' : 'blocked'}, `}service ${res.broker ? 'ok' : 'blocked'}, direct path ${res.direct ? 'ok' : 'blocked'}, backup route ${res.relay ? 'ok' : 'blocked'}.</p>`.__raw;
   btn.disabled = false; btn.textContent = 'Run it again';
 };
 actions['to-check'] = () => renderCheck();
