@@ -2,6 +2,7 @@
 
 import {
   html, setScreen, byId, actions, nav, pick, sfx, confetti, shapeIcon, mascot, uid, session, mmss, avatarHtml,
+  pose, icon, medalImg,
   isMuted, setSoundRole,
 } from './util.js';
 import { connectToGame, friendlyError } from './transport.js';
@@ -110,8 +111,8 @@ function onMsg(m) {
     case 'rr': S.rfb = m; renderRaceQ(); break;
     case 'rf': renderRaceDone(m); break;
     case 'end': S.ended = true; S.phase = 'end'; renderEnd(m); break;
-    case 'kick': S.ended = true; session.del(KEY); renderMessage('👋', 'You were removed from the game', 'Ask your teacher if that was a mistake.'); break;
-    case 'bye': S.ended = true; session.del(KEY); renderMessage('🎈', 'The game has ended', 'Thanks for playing!'); break;
+    case 'kick': S.ended = true; session.del(KEY); renderMessage(pose('oops'), 'You were removed from the game', 'Ask your teacher if that was a mistake.'); break;
+    case 'bye': S.ended = true; session.del(KEY); renderMessage(pose('cheer'), 'The game has ended', 'Thanks for playing!'); break;
     default: break;
   }
 }
@@ -196,7 +197,7 @@ function renderLocked() {
       <div class="locked-tile opt opt-${S.chosen}"><span class="badge">${shapeIcon(S.chosen)}</span><span class="otext">${m.options[S.chosen]}</span></div>
       <h1>Locked in!</h1>
       <p class="lead">Waiting for everyone else...</p>
-      <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="wait-star">${pose('wait')}</div>
     </main>`);
 }
 
@@ -206,10 +207,10 @@ function renderResult(m) {
   setScreen(`screen player result ${m.ok ? 'ok' : 'no'}`, html`
     ${header()}
     <main class="center-col">
-      <div class="bigemoji pop">${m.ok ? '🎉' : m.none ? '⏰' : '💫'}</div>
+      <div class="bigemoji pop">${m.ok ? pose('cheer') : pose('oops')}</div>
       <h1>${m.ok ? pick(PRAISE) : m.none ? "Time's up!" : pick(OOPS)}</h1>
       ${m.ok ? html`<p class="gain">+${m.gain}</p>` : html`<p class="lead">The answer was<br><b>${m.correctText}</b></p>`}
-      ${m.streak >= 2 ? html`<p class="streak-note">🔥 ${m.streak} in a row!</p>` : ''}
+      ${m.streak >= 2 ? html`<p class="streak-note">${icon('flame')} ${m.streak} in a row!</p>` : ''}
       <div class="stats">
         <div><span>Rank</span><b>#${m.rank}</b></div>
         <div><span>Score</span><b>${m.score}</b></div>
@@ -233,13 +234,13 @@ function renderRaceQ() {
     return 'dim';
   };
   setScreen('screen player question race', html`
-    ${header(html`<span class="chip">🪙 ${score}</span><span class="clock" id="rclock"></span>`)}
+    ${header(html`<span class="chip">${icon('coin')} ${score}</span><span class="clock" id="rclock"></span>`)}
     <div class="progress" aria-label="${done} of ${m.total} done"><i style="width:${pct}%"></i><span>${done} / ${m.total}</span></div>
     <h1 class="pq">${m.text}</h1>
     <div class="popts">${m.options.map((o, i) => optButton(o, i, state(i), S.rpick != null || fb ? 'disabled' : ''))}</div>
     <div class="feedback">
       ${fb ? (fb.ok
-        ? html`<b class="good">${fb.finished ? 'You finished the race!' : pick(PRAISE)} +${fb.gain + fb.bonus}</b>${streak >= 3 ? html` <span>🔥 ${streak}</span>` : ''}`
+        ? html`<b class="good">${fb.finished ? 'You finished the race!' : pick(PRAISE)} +${fb.gain + fb.bonus}</b>${streak >= 3 ? html` <span>${icon('flame')} ${streak}</span>` : ''}`
         : html`<b class="bad">Not quite! That one will come back around.</b><button class="btn btn-sky" data-action="p-next">Got it</button>`)
         : (S.rpick != null ? html`<span class="hint">Checking...</span>` : '')}
     </div>`);
@@ -268,7 +269,7 @@ function renderRaceDone(m) {
   setScreen('screen player result ok', html`
     ${header()}
     <main class="center-col">
-      <div class="bigemoji pop">🏁</div>
+      <div class="bigemoji pop">${m.place && m.place <= 3 ? medalImg(m.place) : icon('flag')}</div>
       <h1>You finished!</h1>
       <p class="lead">${m.place ? `You crossed the finish line in place #${m.place}.` : 'You crossed the finish line.'}</p>
       <div class="stats"><div><span>Coins</span><b>${m.score}</b></div></div>
@@ -280,7 +281,7 @@ function renderRaceDone(m) {
 
 function renderEnd(m) {
   S.timers.forEach(clearInterval); S.timers = [];
-  const medal = m.rank === 1 ? '🥇' : m.rank === 2 ? '🥈' : m.rank === 3 ? '🥉' : '⭐';
+  const medal = m.rank >= 1 && m.rank <= 3 ? medalImg(m.rank) : pose('cheer');
   const title = m.rank === 1 ? 'You won!' : m.rank <= 3 ? 'You made the podium!' : 'Great job!';
   setScreen('screen player result ok', html`
     ${header()}

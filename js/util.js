@@ -110,16 +110,23 @@ export const SHAPE_NAMES = ['Heart', 'Star', 'Moon', 'Flower'];
 export const shapeIcon = (i) =>
   raw(`<svg class="shape" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${SHAPE_SVG[i % 4]}</svg>`);
 
-// The Storybook Arcade star mascot.
-export const mascot = (cls = '') => raw(`
-<svg class="mascot ${cls}" viewBox="0 0 100 100" role="img" aria-label="Smiling star mascot">
-  <polygon points="50,10 64.1,34.6 91.9,40.4 72.8,61.4 75.9,89.6 50,78 24.1,89.6 27.2,61.4 8.2,40.4 35.9,34.6"
-    fill="#FFF07C" stroke="#14181F" stroke-width="5" stroke-linejoin="round"/>
-  <ellipse cx="42" cy="52" rx="3.4" ry="4.4" fill="#14181F"/><ellipse cx="58" cy="52" rx="3.4" ry="4.4" fill="#14181F"/>
-  <circle cx="43.1" cy="50.4" r="1.2" fill="#fff"/><circle cx="59.1" cy="50.4" r="1.2" fill="#fff"/>
-  <ellipse cx="35.5" cy="61" rx="4.6" ry="3" fill="#FF7EB6" opacity=".85"/><ellipse cx="64.5" cy="61" rx="4.6" ry="3" fill="#FF7EB6" opacity=".85"/>
-  <path d="M44 60.5 Q50 67.5 56 60.5" fill="none" stroke="#14181F" stroke-width="3.2" stroke-linecap="round"/>
-</svg>`);
+// ---------- Star mascot, icons and medals (pictures in assets/) ----------
+const POSES = ['stand', 'cheer', 'oops', 'wait'];
+const ICONS = ['coin', 'flame', 'flag', 'trophy', 'heart', 'joystick', 'controller', 'book', 'pencil', 'bookmark'];
+const MEDALS = ['gold', 'silver', 'bronze'];
+const pic = (src, cls) => raw(`<img class="${cls}" src="${src}" alt="" draggable="false">`);
+
+// The star mascot in a pose: stand, cheer (happy), oops (try again), wait (sleepy).
+export const pose = (name, cls = '') => pic(`assets/mascot/${POSES.includes(name) ? name : 'stand'}.png`, `pose ${cls}`.trim());
+export const mascot = (cls = '') => pic('assets/mascot/stand.png', `mascot ${cls}`.trim());
+// A small drawn icon that sits in a line of text: coin, flame, flag, trophy, heart, joystick...
+export const icon = (name) => pic(`assets/icons/${ICONS.includes(name) ? name : 'coin'}.png`, 'ico');
+// A medal for 1st, 2nd or 3rd place.
+export const medalImg = (place, cls = '') => pic(`assets/medals/${MEDALS[Math.min(Math.max(place, 1), 3) - 1]}.png`, `medal ${cls}`.trim());
+export function preloadArt() {
+  [...POSES.map((n) => `mascot/${n}`), ...ICONS.map((n) => `icons/${n}`), ...MEDALS.map((n) => `medals/${n}`)]
+    .forEach((p) => { const i = new Image(); i.src = `assets/${p}.png`; });
+}
 
 // ---------- Sounds (tiny WebAudio blips, no files needed) ----------
 let actx = null;

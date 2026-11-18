@@ -2,7 +2,7 @@
 // host.js (teacher), player.js (students) and editor.js (quiz maker).
 
 import {
-  html, setScreen, app, actions, nav, byId, toast, mascot, AVATARS, avatarHtml, avatarName, preloadBuddies, pick, store, session, toggleMute, sfx,
+  html, setScreen, app, actions, nav, byId, toast, mascot, AVATARS, avatarHtml, avatarName, preloadBuddies, preloadArt, icon, pick, store, session, toggleMute, sfx,
 } from './util.js';
 import { APP_NAME, BYLINE } from './config.js';
 import { allQuizzes, findQuiz, copyOf, blankQuiz, deleteMine, normalizeQuiz, upsertMine, loadMine } from './quizzes.js';
@@ -150,10 +150,10 @@ function renderSetup(quiz) {
         <fieldset class="modes">
           <legend>Choose a game mode</legend>
           <label class="modecard"><input type="radio" name="mode" value="live" checked>
-            <span class="modebody"><span class="modeicon">🎤</span><b>Live Quiz</b>
+            <span class="modebody"><span class="modeicon">${icon('joystick')}</span><b>Live Quiz</b>
             <span>Everyone answers together while your big screen leads the way. Faster answers earn more points.</span></span></label>
           <label class="modecard"><input type="radio" name="mode" value="race">
-            <span class="modebody"><span class="modeicon">🏁</span><b>Race</b>
+            <span class="modebody"><span class="modeicon">${icon('flag')}</span><b>Race</b>
             <span>Everyone plays at their own speed and races to the finish. Missed questions come back around.</span></span></label>
         </fieldset>
         <label class="field" id="race-opts" hidden><span>Race length</span>
@@ -201,6 +201,7 @@ actions.mute = (_d, el) => { el.textContent = toggleMute() ? '🔇' : '🔊'; };
 // ---------- Start ----------
 function start() {
   preloadBuddies();
+  preloadArt();
   const wantsPin = new URLSearchParams(location.search).get('pin');
   const saved = session.get('quizparty.player');
   if (saved && wantsPin && saved.pin !== wantsPin) { leaveGame(); }

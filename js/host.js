@@ -3,7 +3,7 @@
 
 import {
   html, raw, setScreen, byId, actions, nav, shuffle, toast, sfx, confetti, shapeIcon, mascot,
-  AVATARS, avatarHtml, uid, mmss, downloadFile, csvCell, isMuted, setSoundRole,
+  AVATARS, avatarHtml, icon, medalImg, uid, mmss, downloadFile, csvCell, isMuted, setSoundRole,
 } from './util.js';
 import { openHost, friendlyError } from './transport.js';
 import { MAX_PLAYERS } from './config.js';
@@ -392,13 +392,13 @@ function renderBoard() {
       <button class="btn btn-pink" data-action="h-next">Next question &rarr;</button>
     </header>
     <main class="board-main">
-      <h1>Leaderboard</h1>
+      <h1>${icon('trophy')} Leaderboard</h1>
       <ol class="board">${top.map((p, i) => html`
         <li class="brow" style="--d:${i * 90}ms">
           <span class="rank">${i + 1}</span><span class="av">${avatarHtml(p.avatar)}</span><span class="nm">${p.name}</span>
           <span class="barwrap"><i style="width:${Math.max(3, Math.round((p.score / best) * 100))}%"></i></span>
           <b class="sc">${p.score}</b>
-          ${p.streak >= 2 ? html`<span class="streak" title="${p.streak} in a row">🔥${p.streak}</span>` : ''}
+          ${p.streak >= 2 ? html`<span class="streak" title="${p.streak} in a row">${icon('flame')}${p.streak}</span>` : ''}
         </li>`)}
       </ol>
     </main>`);
@@ -518,8 +518,8 @@ function updateLane(p) {
     el.className = 'lane'; el.dataset.pid = p.pid;
     el.innerHTML = html`
       <span class="lane-name"><span class="av">${avatarHtml(p.avatar)}</span><span class="nm">${p.name}</span></span>
-      <span class="track"><span class="runner" aria-hidden="true">${avatarHtml(p.avatar)}</span><span class="flag">🏁</span></span>
-      <span class="lane-score"><b class="coins">0</b><span class="fire"></span></span>`.__raw;
+      <span class="track"><span class="runner" aria-hidden="true">${avatarHtml(p.avatar)}</span><span class="flag">${icon('flag')}</span></span>
+      <span class="lane-score"><b class="coins">${icon('coin')}<span class="cn">0</span></b><span class="fire"></span></span>`.__raw;
     wrap.appendChild(el);
     wrap.classList.toggle('dense', wrap.children.length > 10);
     wrap.classList.toggle('crowded', wrap.children.length > 22);
@@ -528,9 +528,9 @@ function updateLane(p) {
   el.style.setProperty('--p', frac);
   el.classList.toggle('off', !p.connected);
   el.classList.toggle('done', !!(p.race && p.race.done));
-  el.querySelector('.coins').textContent = p.score;
+  el.querySelector('.cn').textContent = p.score;
   const r = p.race;
-  el.querySelector('.fire').textContent = r && r.done ? '🏁 #' + r.place : p.streak >= 3 ? '🔥' + p.streak : '';
+  el.querySelector('.fire').innerHTML = (r && r.done ? html`${icon('flag')} #${r.place}` : p.streak >= 3 ? html`${icon('flame')}${p.streak}` : html``).__raw;
 }
 
 // ---------- The end ----------
@@ -551,7 +551,7 @@ function renderPodium(l) {
   const spot = (p, place) => (p ? html`
     <div class="spot spot-${place}">
       <div class="spot-av">${avatarHtml(p.avatar)}</div><div class="spot-nm">${p.name}</div><div class="spot-sc">${p.score}</div>
-      <div class="step"><span>${place}</span></div>
+      <div class="step">${medalImg(place)}<span>${place}</span></div>
     </div>` : html`<div class="spot spot-${place} empty"></div>`);
   setScreen('screen host v-podium', html`
     <header class="topbar">

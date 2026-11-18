@@ -92,6 +92,25 @@ To add a new buddy:
 
 The picker grows to fit however many buddies you add.
 
+## The rest of the art
+
+| What | Where | Used for |
+| --- | --- | --- |
+| Star mascot (4 poses) | `assets/mascot/` | home screen, and the result screens kids see (cheer, oops, waiting) |
+| Icons | `assets/icons/` | coins, streak flame, finish flag, trophy and more |
+| Medals | `assets/medals/` | the podium and the end screen |
+| Background pattern | `assets/pattern.png` | the faint doodles behind every screen |
+
+To swap in new art, draw a sheet of separate pictures on a plain white background, then cut it up:
+
+```
+python3 tools/split-sheet.py my-icons.png assets/icons coin flame flag --cols 3 --size 128
+```
+
+Names go in reading order (left to right, then top to bottom). Use `--same-scale --align bottom`
+for a set of poses of one character. To rebuild the background pattern from the icons, run
+`python3 tools/make-pattern.py`. All the tools need `pip install pillow numpy`.
+
 ## Test without students
 
 On the setup screen, tick **Test on this device only**. Open the site in a second tab to play as a
@@ -111,7 +130,7 @@ js/transport.js     PeerJS connection (and the same-device test mode)
 js/config.js        name, byline, player limit
 js/buddies.js       the list of character pictures
 assets/buddies/     the character pictures
-tools/              make-buddy.py, turns a picture into a game avatar
+tools/              make-buddy.py, split-sheet.py, make-pattern.py (turn pictures into game art)
 vendor/ fonts/      PeerJS, QR code library and Poppins, bundled so nothing loads from outside
 server/             optional broker
 ```
