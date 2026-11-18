@@ -12,3 +12,18 @@ export const MAX_PLAYERS = 60;
 //     config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] } };</script>
 // (The older name QUIZ_PARTY_PEER_OPTIONS still works too.)
 export const PEER_OPTIONS = Object.assign({ debug: 0 }, window.QUIZ_PARTY_PEER_OPTIONS || {}, window.STORYBOOK_ARCADE_PEER_OPTIONS || {});
+
+// Custom sounds. To use your own sound effect, put the file (mp3, ogg or wav) in assets/sounds/
+// and list it here. Anything left out keeps the built-in beep. The names you can use are:
+//   join       a player joins
+//   countdown  each 3, 2, 1 beep
+//   start      the game or a question begins
+//   correct    a right answer
+//   wrong      a wrong answer
+//   tick       the last 5 seconds of a question
+//   win        the podium
+//   click      tapping an answer
+export const SOUND_FILES = {
+  // correct: 'assets/sounds/correct.mp3',
+  // wrong: 'assets/sounds/wrong.mp3',
+};

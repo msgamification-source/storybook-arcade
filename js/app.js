@@ -7,7 +7,7 @@ import {
 import { APP_NAME, BYLINE } from './config.js';
 import { allQuizzes, findQuiz, copyOf, blankQuiz, deleteMine, normalizeQuiz, upsertMine, loadMine } from './quizzes.js';
 import { openEditor } from './editor.js';
-import { hostGame } from './host.js';
+import { hostGame, DEFAULT_OPTS } from './host.js';
 import { joinGame, resumeSession, leaveGame } from './player.js';
 
 // ---------- Home and join ----------
@@ -32,7 +32,8 @@ function renderHome(opts = {}) {
         <label class="field"><span>Game PIN</span>
           <input id="pin-in" class="pin-in" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="123456" value="${pin}" aria-describedby="join-err"></label>
         <label class="field"><span>Your nickname</span>
-          <input id="name-in" maxlength="14" placeholder="Star Reader" value="${name}" autocapitalize="words"></label>
+          <input id="name-in" maxlength="14" placeholder="Star Reader" value="${name}" autocapitalize="words" aria-describedby="name-hint"></label>
+        <p class="hint tight" id="name-hint">Your teacher might give you a fun name instead.</p>
         <div class="field"><span id="av-label">Pick your buddy</span>
           <div class="avatars" role="radiogroup" aria-labelledby="av-label">
             ${AVATARS.map((a) => html`<button type="button" class="avbtn ${a === chosenAvatar ? 'on' : ''}" role="radio" aria-checked="${a === chosenAvatar}" data-action="pick-av" data-av="${a}" aria-label="${avatarName(a)}">${avatarHtml(a)}</button>`)}
@@ -62,7 +63,6 @@ function submitJoin() {
   const name = byId('name-in').value.replace(/\s+/g, ' ').trim();
   const err = byId('join-err');
   if (pin.length !== 6) { err.textContent = 'The game PIN is 6 numbers.'; byId('pin-in').focus(); return; }
-  if (!name) { err.textContent = 'Type a nickname so your friends know it is you!'; byId('name-in').focus(); return; }
   err.textContent = '';
   store.set('quizparty.profile', { name, avatar: chosenAvatar });
   sfx.click();
@@ -140,7 +140,11 @@ async function importFile(file) {
 }
 
 // ---------- Game setup ----------
+const HOSTOPTS_KEY = 'quizparty.hostopts';
+
 function renderSetup(quiz) {
+  const o = { ...DEFAULT_OPTS, ...(store.get(HOSTOPTS_KEY, {}) || {}) };
+  const sel = (v, cur) => (String(v) === String(cur) ? 'selected' : '');
   setScreen('screen v-setup', html`
     <header class="topbar"><button class="btn btn-ghost" data-action="to-library">&larr; Back</button></header>
     <main class="setup">
@@ -158,10 +162,49 @@ function renderSetup(quiz) {
         </fieldset>
         <label class="field" id="race-opts" hidden><span>Race length</span>
           <select name="minutes">${[3, 5, 8, 10, 15].map((m) => html`<option value="${m}" ${m === 5 ? 'selected' : ''}>${m} minutes</option>`)}</select></label>
+
+        <section class="card optcard">
+          <h2>Your choices</h2>
+          <label class="field"><span>Student names</span>
+            <select name="names">
+              <option value="own" ${sel('own', o.names)}>Students type their own nickname</option>
+              <option value="random" ${sel('random', o.names)}>Give everyone a fun random name (like "Brave Fox")</option>
+            </select></label>
+          <div id="live-opts">
+            <label class="check"><input type="checkbox" name="devices" ${o.showOnDevices ? 'checked' : ''}>
+              <span>Show the questions and answers on student screens too</span></label>
+            <label class="field"><span>Leaderboard between questions</span>
+              <select name="board">
+                <option value="10" ${sel(10, o.boardSize)}>Top 10</option>
+                <option value="5" ${sel(5, o.boardSize)}>Top 5</option>
+              </select></label>
+            <label class="check"><input type="checkbox" name="auto" ${o.auto ? 'checked' : ''}>
+              <span>Auto-play: move on by itself after each answer and leaderboard</span></label>
+            <label class="field" id="delay-row" ${o.auto ? '' : 'hidden'}><span>Stay on each screen for</span>
+              <select name="delay">${[3, 5, 8, 12].map((d) => html`<option value="${d}" ${sel(d, o.delay)}>${d} seconds</option>`)}</select></label>
+            <label class="check"><input type="checkbox" name="shuffleQ" ${o.shuffleQ ? 'checked' : ''}>
+              <span>Mix up the question order</span></label>
+            <label class="check"><input type="checkbox" name="shuffleA" ${o.shuffleA ? 'checked' : ''}>
+              <span>Mix up the answer order</span></label>
+          </div>
+        </section>
+
         <label class="check"><input type="checkbox" name="local"> <span>Test on this device only. Open this page in another tab to play as a student.</span></label>
         <button class="btn btn-pink btn-lg" type="submit">Open game room</button>
       </form>
     </main>`);
+}
+
+function readHostOptions(f) {
+  return {
+    names: f.elements.names.value === 'random' ? 'random' : 'own',
+    showOnDevices: f.elements.devices.checked,
+    boardSize: Number(f.elements.board.value) === 5 ? 5 : 10,
+    auto: f.elements.auto.checked,
+    delay: Number(f.elements.delay.value) || 5,
+    shuffleQ: f.elements.shuffleQ.checked,
+    shuffleA: f.elements.shuffleA.checked,
+  };
 }
 
 actions['lib-play'] = ({ id }) => { const qz = findQuiz(id); if (qz) renderSetup(qz); };
@@ -180,15 +223,20 @@ app.addEventListener('submit', (e) => {
   else if (e.target.id === 'setup-form') {
     const f = e.target; const quiz = findQuiz(f.dataset.id);
     if (!quiz) return;
+    const opts = readHostOptions(f);
+    store.set(HOSTOPTS_KEY, opts); // remember the teacher's choices for next time
     hostGame({
       quiz, mode: f.elements.mode.value, local: f.elements.local.checked,
-      minutes: Number(f.elements.minutes.value) || 5,
+      minutes: Number(f.elements.minutes.value) || 5, opts,
     });
   }
 });
 
 app.addEventListener('change', (e) => {
-  if (e.target.name === 'mode') byId('race-opts').hidden = e.target.value !== 'race';
+  if (e.target.name === 'mode') {
+    byId('race-opts').hidden = e.target.value !== 'race';
+    byId('live-opts').hidden = e.target.value === 'race';
+  } else if (e.target.name === 'auto') byId('delay-row').hidden = !e.target.checked;
   else if (e.target.id === 'imp' && e.target.files[0]) { importFile(e.target.files[0]); e.target.value = ''; }
 });
 

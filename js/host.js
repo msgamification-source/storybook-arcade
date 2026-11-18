@@ -3,7 +3,7 @@
 
 import {
   html, raw, setScreen, byId, actions, nav, shuffle, toast, sfx, confetti, shapeIcon, mascot,
-  AVATARS, avatarHtml, icon, medalImg, uid, mmss, downloadFile, csvCell, isMuted, setSoundRole,
+  AVATARS, avatarHtml, avatarName, icon, pose, medalImg, uid, mmss, downloadFile, csvCell, isMuted, setSoundRole, countUp,
 } from './util.js';
 import { openHost, friendlyError } from './transport.js';
 import { MAX_PLAYERS } from './config.js';
@@ -16,7 +16,47 @@ const connected = () => list().filter((p) => p.connected);
 const curQ = () => G.quiz.questions[G.qi];
 const nQ = () => G.quiz.questions.length;
 const send = (p, msg) => { if (G && p && p.conn) G.transport.send(p.conn, msg); };
-const cleanName = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 14);
+const cleanName = (s, max = 14) => String(s ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+
+// What the teacher can choose before a game starts (the setup screen fills these in).
+export const DEFAULT_OPTS = {
+  names: 'own',          // 'own' = students type a nickname, 'random' = the game gives everyone a fun name
+  showOnDevices: true,   // show questions and answers on student screens
+  boardSize: 10,         // how many players the leaderboard shows between questions
+  auto: false,           // move on by itself after the answer reveal and the leaderboard
+  delay: 5,              // seconds to stay on each screen when auto-play is on
+  shuffleQ: false,       // mix up the question order
+  shuffleA: false,       // mix up the answer order
+};
+
+const ADJECTIVES = ['Happy', 'Brave', 'Sparkly', 'Zippy', 'Cosmic', 'Jolly', 'Cozy', 'Mighty', 'Clever', 'Bouncy',
+  'Sunny', 'Giddy', 'Lucky', 'Swift', 'Witty', 'Daring', 'Speedy', 'Snazzy', 'Chirpy', 'Fuzzy', 'Sleepy', 'Cheery',
+  'Plucky', 'Peppy', 'Zesty', 'Perky', 'Merry', 'Wild'];
+// A friendly name that matches the player's buddy, like "Brave Fox". Never repeats in one game.
+function randomName(avatar) {
+  const noun = avatarName(avatar);
+  const taken = new Set(list().map((p) => p.name.toLowerCase()));
+  for (let i = 0; i < 60; i++) {
+    const n = `${ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]} ${noun}`;
+    if (!taken.has(n.toLowerCase())) return n;
+  }
+  let k = 2;
+  while (taken.has(`${noun} ${k}`.toLowerCase())) k++;
+  return `${noun} ${k}`;
+}
+
+// A copy of the quiz for this game, with the order mixed up if the teacher asked for that.
+function prepareQuiz(quiz, o) {
+  let qs = quiz.questions.map((q) => ({ ...q, options: [...q.options] }));
+  if (o.shuffleA) {
+    qs = qs.map((q) => {
+      const idx = shuffle(q.options.map((_, i) => i));
+      return { ...q, options: idx.map((i) => q.options[i]), correct: idx.indexOf(q.correct) };
+    });
+  }
+  if (o.shuffleQ) qs = shuffle(qs);
+  return { ...quiz, questions: qs };
+}
 const prettyPin = (pin) => pin.slice(0, 3) + ' ' + pin.slice(3);
 const MODE_LABEL = { live: 'Live Quiz', race: 'Race' };
 
@@ -46,7 +86,7 @@ function qrSvg(text) {
 function warnUnload(e) { if (G && G.phase !== 'end') { e.preventDefault(); e.returnValue = ''; } }
 
 // ---------- Start / stop ----------
-export async function hostGame({ quiz, mode, local, minutes }) {
+export async function hostGame({ quiz, mode, local, minutes, opts }) {
   setSoundRole('host');
   setScreen('screen center', html`<div class="loading">${mascot('bob')}<p>Opening your game room...</p></div>`);
   let transport;
@@ -61,8 +101,10 @@ export async function hostGame({ quiz, mode, local, minutes }) {
         <button class="btn btn-sky" data-action="to-library">Back</button>
       </div>`);
   }
+  const o = { ...DEFAULT_OPTS, ...(opts || {}) };
   G = {
-    quiz, mode, local, minutes: minutes || 5, transport, pin: transport.pin,
+    quiz: prepareQuiz(quiz, o), opts: o, mode, local, minutes: minutes || 5, transport, pin: transport.pin,
+    autoTimer: 0, autoTick: 0, autoPaused: false,
     players: new Map(), conns: new Map(), phase: 'lobby',
     qi: -1, answers: new Map(), qStart: 0, limit: 20, counts: [], ticker: 0, allTimer: 0,
     finishCount: 0, raceEnd: 0,
@@ -76,7 +118,7 @@ export async function hostGame({ quiz, mode, local, minutes }) {
 
 export function stopHosting() {
   if (!G) return;
-  clearInterval(G.ticker); clearTimeout(G.allTimer);
+  clearInterval(G.ticker); clearTimeout(G.allTimer); clearAuto();
   list().forEach((p) => p.race && clearTimeout(p.race.timer));
   try { G.transport.broadcast({ t: 'bye' }); } catch { /* ignore */ }
   const t = G.transport;
@@ -114,12 +156,14 @@ function onJoin(conn, m) {
     G.transport.send(conn, { t: 'rej', reason });
     setTimeout(() => { if (G) G.transport.drop(conn); }, 400);
   };
-  const name = cleanName(m.name);
-  if (!name) return reject('name');
+  const random = G.opts.names === 'random';
+  const typed = cleanName(m.name);
+  const avatar = AVATARS.includes(m.avatar) ? m.avatar : AVATARS[0];
   const pidIn = typeof m.pid === 'string' ? m.pid.slice(0, 40) : '';
   let p = pidIn ? G.players.get(pidIn) : null;
-  if (!p) {
-    const same = list().find((x) => x.name.toLowerCase() === name.toLowerCase());
+  if (!p && !random) {
+    if (!typed) return reject('name');
+    const same = list().find((x) => x.name.toLowerCase() === typed.toLowerCase());
     if (same) { if (!same.connected) p = same; else return reject('taken'); }
   }
   if (p) { // coming back after a refresh or Wi-Fi blip
@@ -128,8 +172,8 @@ function onJoin(conn, m) {
   } else {
     if (G.players.size >= MAX_PLAYERS) return reject('full');
     p = {
-      pid: uid(), name, avatar: AVATARS.includes(m.avatar) ? m.avatar : AVATARS[0],
-      conn, connected: true, score: 0, streak: 0, correct: 0, last: null, rank: 0, race: null,
+      pid: uid(), name: random ? randomName(avatar) : typed, avatar,
+      conn, connected: true, score: 0, streak: 0, correct: 0, last: null, rank: 0, prevRank: 0, delta: 0, race: null,
     };
     G.players.set(p.pid, p);
   }
@@ -152,6 +196,7 @@ function snapshot(p) {
       if (p.last && p.last.i === G.qi) send(p, resultMsg(p));
       else send(p, { t: 'wait', text: 'Hang tight! The next question is coming up.' });
       break;
+    case 'countdown': send(p, { t: 'cd' }); break;
     case 'race': startRaceFor(p); break;
     case 'end': send(p, endMsg(p)); break;
     default: break;
@@ -229,18 +274,46 @@ actions['h-kick'] = ({ pid }) => {
 
 actions['h-start'] = () => {
   if (!G || G.phase !== 'lobby' || connected().length === 0) return;
-  if (G.mode === 'race') startRace(); else startQuestion(0);
+  beginCountdown();
 };
+
+// 3, 2, 1 on every screen, then the game begins.
+function beginCountdown() {
+  G.phase = 'countdown';
+  connected().forEach((p) => send(p, { t: 'cd' }));
+  let n = 3;
+  const show = () => {
+    if (!byId('cd')) {
+      setScreen('screen host v-count', html`<main class="cd-wrap">${pose('stand', 'cd-star')}<p class="cd-label">Get ready!</p><div id="cd" class="cd-num" aria-live="assertive"></div></main>`);
+    }
+    const el = byId('cd');
+    el.textContent = n; el.classList.remove('cd-pop'); void el.offsetWidth; el.classList.add('cd-pop');
+    sfx.countdown();
+  };
+  show();
+  clearInterval(G.ticker);
+  G.ticker = setInterval(() => {
+    n--;
+    if (!G || G.phase !== 'countdown') { clearInterval(G && G.ticker); return; }
+    if (n > 0) { show(); return; }
+    clearInterval(G.ticker);
+    if (G.mode === 'race') startRace(); else startQuestion(0);
+  }, 1000);
+}
 
 // ---------- Live quiz ----------
 function remaining() { return Math.max(0, G.limit - (Date.now() - G.qStart) / 1000); }
 function qMsg(left) {
   const q = curQ();
-  return { t: 'q', i: G.qi, n: nQ(), text: q.text, options: q.options, limit: q.time, left: Math.round(left * 10) / 10 };
+  const hide = !G.opts.showOnDevices;
+  return {
+    t: 'q', i: G.qi, n: nQ(), hide, text: hide ? '' : q.text, options: hide ? q.options.map(() => '') : q.options,
+    limit: q.time, left: Math.round(left * 10) / 10,
+  };
 }
 
 function startQuestion(i) {
-  clearInterval(G.ticker); clearTimeout(G.allTimer);
+  clearInterval(G.ticker); clearTimeout(G.allTimer); clearAuto();
   G.qi = i; G.phase = 'question'; G.answers = new Map();
   G.limit = curQ().time; G.qStart = Date.now();
   connected().forEach((p) => send(p, qMsg(G.limit)));
@@ -280,6 +353,7 @@ function endQuestion() {
   if (!G || G.phase !== 'question') return;
   clearInterval(G.ticker); clearTimeout(G.allTimer);
   G.phase = 'reveal';
+  list().forEach((p) => { p.prevRank = p.rank || 0; });
   const q = curQ();
   const counts = q.options.map(() => 0);
   list().forEach((p) => {
@@ -298,6 +372,7 @@ function endQuestion() {
   });
   G.counts = counts;
   ranked();
+  list().forEach((p) => { p.delta = p.prevRank ? p.prevRank - p.rank : 0; });
   connected().forEach((p) => send(p, resultMsg(p)));
   renderReveal();
 }
@@ -307,12 +382,13 @@ function resultMsg(p) {
   return {
     t: 'r', i: G.qi, correct: q.correct, correctText: q.options[q.correct],
     ok: p.last.ok, none: p.last.none, gain: p.last.gain,
-    score: p.score, streak: p.streak, rank: p.rank, of: G.players.size,
+    score: p.score, streak: p.streak, rank: p.rank, delta: p.delta || 0, of: G.players.size,
   };
 }
 
 actions['h-next'] = () => {
   if (!G) return;
+  clearAuto();
   if (G.phase === 'reveal') { if (G.qi >= nQ() - 1) finishGame(); else renderBoard(); }
   else if (G.phase === 'board') startQuestion(G.qi + 1);
 };
@@ -322,10 +398,38 @@ actions['h-end'] = () => {
   if (G.phase === 'race') endRace(); else finishGame();
 };
 
+// ---------- Auto-play ----------
+function clearAuto() {
+  if (!G) return;
+  clearTimeout(G.autoTimer); clearInterval(G.autoTick);
+  G.autoAt = 0;
+}
+function scheduleAuto() {
+  clearAuto();
+  if (!G.opts.auto) return;
+  if (!G.autoPaused) {
+    G.autoAt = Date.now() + G.opts.delay * 1000;
+    G.autoTimer = setTimeout(() => { if (G) actions['h-next'](); }, G.opts.delay * 1000);
+    G.autoTick = setInterval(updateAutoLabel, 250);
+  }
+  updateAutoLabel();
+}
+function updateAutoLabel() {
+  const b = byId('auto');
+  if (!b || !G) return;
+  b.textContent = G.autoPaused ? 'Resume auto-play' : `Auto-play: next in ${Math.max(0, Math.ceil((G.autoAt - Date.now()) / 1000))}`;
+}
+actions['h-auto'] = () => {
+  if (!G) return;
+  G.autoPaused = !G.autoPaused;
+  scheduleAuto();
+};
+const autoButton = () => (G.opts.auto ? html`<button class="btn btn-ghost" id="auto" data-action="h-auto"></button>` : '');
+
 function optsHtml(q, counts) {
   const max = counts ? Math.max(1, ...counts) : 1;
   return html`<div class="opts n${q.options.length}">${q.options.map((o, i) => html`
-    <div class="opt opt-${i} ${counts ? (i === q.correct ? 'right' : 'wrong') : ''}">
+    <div class="opt opt-${i} ${counts ? (i === q.correct ? 'right' : 'wrong') : 'enter'}" style="--i:${i}">
       <span class="badge">${shapeIcon(i)}</span>
       <span class="otext">${o}</span>
       ${counts ? html`<span class="count">${counts[i]}</span><i class="bar" style="width:${Math.round((counts[i] / max) * 100)}%"></i>` : ''}
@@ -376,32 +480,41 @@ function renderReveal() {
     <header class="qbar">
       <div class="chip">Question ${G.qi + 1} of ${nQ()}</div>
       <div class="answered"><b>${G.answers.size}</b> of ${connected().length} answered</div>
-      <button class="btn btn-pink" data-action="h-next">${last ? 'See results' : 'Next'} &rarr;</button>
+      <div class="row">${autoButton()}<button class="btn btn-pink" data-action="h-next">${last ? 'See results' : 'Next'} &rarr;</button></div>
     </header>
     <main class="qmain"><div class="timer ghost" aria-hidden="true"></div><h1 class="qtext">${q.text}</h1></main>
     ${optsHtml(q, G.counts)}`);
+  scheduleAuto();
 }
 
 function renderBoard() {
   G.phase = 'board';
-  const top = ranked().slice(0, 5);
+  const top = ranked().slice(0, G.opts.boardSize);
   const best = Math.max(1, top[0] ? top[0].score : 1);
+  const tight = top.length > 6;
   setScreen('screen host v-board', html`
     <header class="topbar">
       <div class="chip">After question ${G.qi + 1} of ${nQ()}</div>
-      <button class="btn btn-pink" data-action="h-next">Next question &rarr;</button>
+      <div class="row">${autoButton()}<button class="btn btn-pink" data-action="h-next">Next question &rarr;</button></div>
     </header>
     <main class="board-main">
       <h1>${icon('trophy')} Leaderboard</h1>
-      <ol class="board">${top.map((p, i) => html`
-        <li class="brow" style="--d:${i * 90}ms">
-          <span class="rank">${i + 1}</span><span class="av">${avatarHtml(p.avatar)}</span><span class="nm">${p.name}</span>
+      <ol class="board ${tight ? 'tight' : ''}">${top.map((p, i) => html`
+        <li class="brow" style="--d:${i * 70}ms;--shift:${Math.max(-10, Math.min(10, p.prevRank ? p.prevRank - p.rank : 0))}">
+          <span class="rank">${p.rank}</span><span class="av">${avatarHtml(p.avatar)}</span><span class="nm">${p.name}</span>
           <span class="barwrap"><i style="width:${Math.max(3, Math.round((p.score / best) * 100))}%"></i></span>
-          <b class="sc">${p.score}</b>
-          ${p.streak >= 2 ? html`<span class="streak" title="${p.streak} in a row">${icon('flame')}${p.streak}</span>` : ''}
+          <b class="sc" data-from="${p.score - (p.last && p.last.i === G.qi ? p.last.gain : 0)}" data-to="${p.score}">${p.score}</b>
+          ${p.prevRank && p.delta > 0 ? html`<span class="delta up" title="Moved up ${p.delta}">&#9650;${p.delta}</span>`
+            : p.prevRank && p.delta < 0 ? html`<span class="delta down" title="Moved down ${-p.delta}">&#9660;${-p.delta}</span>`
+            : html`<span class="delta"></span>`}
+          ${p.streak >= 2 ? html`<span class="streak" title="${p.streak} in a row">${icon('flame')}${p.streak}</span>` : html`<span class="streak"></span>`}
         </li>`)}
       </ol>
     </main>`);
+  document.querySelectorAll('.board .sc[data-to]').forEach((el, i) => {
+    countUp(el, Number(el.dataset.to), { from: Number(el.dataset.from), ms: 900, delay: 400 + i * 70 });
+  });
+  scheduleAuto();
 }
 
 // ---------- Race ----------
@@ -525,6 +638,9 @@ function updateLane(p) {
     wrap.classList.toggle('crowded', wrap.children.length > 22);
   }
   const frac = p.race ? Math.min(1, p.race.correct / nQ()) : 0;
+  const runner = el.querySelector('.runner');
+  if (frac > Number(el.dataset.p || 0) && runner) { runner.classList.remove('hop'); void runner.offsetWidth; runner.classList.add('hop'); }
+  el.dataset.p = frac;
   el.style.setProperty('--p', frac);
   el.classList.toggle('off', !p.connected);
   el.classList.toggle('done', !!(p.race && p.race.done));
@@ -539,7 +655,7 @@ function endMsg(p) {
 }
 
 function finishGame() {
-  clearInterval(G.ticker); clearTimeout(G.allTimer);
+  clearInterval(G.ticker); clearTimeout(G.allTimer); clearAuto();
   G.phase = 'end';
   const l = ranked();
   connected().forEach((p) => send(p, endMsg(p)));

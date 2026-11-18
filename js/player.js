@@ -2,7 +2,7 @@
 
 import {
   html, setScreen, byId, actions, nav, pick, sfx, confetti, shapeIcon, mascot, uid, session, mmss, avatarHtml,
-  pose, icon, medalImg,
+  pose, icon, medalImg, countUp,
   isMuted, setSoundRole,
 } from './util.js';
 import { connectToGame, friendlyError } from './transport.js';
@@ -100,9 +100,10 @@ function onMsg(m) {
       break;
     case 'rej':
       leaveWith(m.reason === 'taken' ? 'Someone is already using that name. Try another one!'
-        : m.reason === 'full' ? 'That game is full.' : 'Please pick a nickname.');
+        : m.reason === 'full' ? 'That game is full.' : 'This game needs a nickname. Type one and try again!');
       break;
     case 'wait': renderWaiting(m.text); break;
+    case 'cd': renderCountdown(); break;
     case 'q': S.phase = 'question'; S.q = m; S.chosen = null; S.qEnds = Date.now() + m.left * 1000; renderQuestion(); break;
     case 'ack': S.chosen = m.c; renderLocked(); break;
     case 'r': S.phase = 'result'; renderResult(m); break;
@@ -147,17 +148,17 @@ function renderWaiting(text) {
 }
 
 function optButton(text, i, cls = '', attrs = '') {
-  return html`<button class="opt opt-${i} ${cls}" data-action="p-pick" data-c="${i}" ${attrs}>
+  return html`<button class="opt opt-${i} ${cls}" style="--i:${i}" data-action="p-pick" data-c="${i}" ${attrs}>
     <span class="badge">${shapeIcon(i)}</span><span class="otext">${text}</span></button>`;
 }
 
 function renderQuestion() {
   S.timers.forEach(clearInterval); S.timers = [];
   const m = S.q;
-  setScreen('screen player question', html`
+  setScreen(`screen player question${m.hide ? ' shapes' : ''}`, html`
     ${header(html`<span class="chip">${m.i + 1} / ${m.n}</span>`)}
-    <h1 class="pq">${m.text}</h1>
-    <div class="popts">${m.options.map((o, i) => optButton(o, i))}</div>
+    <h1 class="pq">${m.hide ? 'Look at the big screen!' : m.text}</h1>
+    <div class="popts">${m.options.map((o, i) => optButton(o, i, 'enter'))}</div>
     <div class="timebar" aria-hidden="true"><i id="tbar"></i></div>`);
   const total = m.limit * 1000;
   const upd = () => {
@@ -209,13 +210,33 @@ function renderResult(m) {
     <main class="center-col">
       <div class="bigemoji pop">${m.ok ? pose('cheer') : pose('oops')}</div>
       <h1>${m.ok ? pick(PRAISE) : m.none ? "Time's up!" : pick(OOPS)}</h1>
-      ${m.ok ? html`<p class="gain">+${m.gain}</p>` : html`<p class="lead">The answer was<br><b>${m.correctText}</b></p>`}
+      ${m.ok ? html`<p class="gain">+0</p>` : html`<p class="lead">The answer was<br><b>${m.correctText}</b></p>`}
       ${m.streak >= 2 ? html`<p class="streak-note">${icon('flame')} ${m.streak} in a row!</p>` : ''}
+      ${m.delta > 0 ? html`<p class="moved up">&#9650; Up ${m.delta} ${m.delta === 1 ? 'place' : 'places'}!</p>`
+        : m.delta < 0 ? html`<p class="moved down">&#9660; Down ${-m.delta} ${m.delta === -1 ? 'place' : 'places'}</p>` : ''}
       <div class="stats">
         <div><span>Rank</span><b>#${m.rank}</b></div>
-        <div><span>Score</span><b>${m.score}</b></div>
+        <div><span>Score</span><b id="myscore">${m.score}</b></div>
       </div>
     </main>`);
+  if (m.ok) countUp(document.querySelector('.player .gain'), m.gain, { ms: 700, prefix: '+' });
+  countUp(byId('myscore'), m.score, { from: m.score - m.gain, ms: 900, delay: 300 });
+}
+
+// 3, 2, 1 before the game starts.
+function renderCountdown() {
+  S.timers.forEach(clearInterval); S.timers = [];
+  setScreen('screen player center', html`
+    <div class="cd-wrap">${pose('stand', 'cd-star')}<p class="cd-label">Get ready!</p><div id="cd" class="cd-num" aria-live="assertive"></div></div>`);
+  let n = 3;
+  const show = () => {
+    const el = byId('cd');
+    if (!el) return;
+    el.textContent = n; el.classList.remove('cd-pop'); void el.offsetWidth; el.classList.add('cd-pop');
+    sfx.countdown();
+  };
+  show();
+  S.timers.push(setInterval(() => { n--; if (n <= 0) { S.timers.forEach(clearInterval); return; } show(); }, 1000));
 }
 
 // ----- Race mode -----

@@ -76,6 +76,7 @@ export const session = {
 
 // ---------- Avatars and shapes ----------
 import { BUDDIES } from './buddies.js';
+import { SOUND_FILES } from './config.js';
 
 // An avatar is stored as the text "buddy:fox". Older saved emoji avatars still display.
 export const AVATARS = BUDDIES.map((b) => 'buddy:' + b.id);
@@ -120,7 +121,7 @@ const pic = (src, cls) => raw(`<img class="${cls}" src="${src}" alt="" draggable
 export const pose = (name, cls = '') => pic(`assets/mascot/${POSES.includes(name) ? name : 'stand'}.png`, `pose ${cls}`.trim());
 export const mascot = (cls = '') => pic('assets/mascot/stand.png', `mascot ${cls}`.trim());
 // A small drawn icon that sits in a line of text: coin, flame, flag, trophy, heart, joystick...
-export const icon = (name) => pic(`assets/icons/${ICONS.includes(name) ? name : 'coin'}.png`, 'ico');
+export const icon = (name) => { const n = ICONS.includes(name) ? name : 'coin'; return pic(`assets/icons/${n}.png`, `ico ico-${n}`); };
 // A medal for 1st, 2nd or 3rd place.
 export const medalImg = (place, cls = '') => pic(`assets/medals/${MEDALS[Math.min(Math.max(place, 1), 3) - 1]}.png`, `medal ${cls}`.trim());
 export function preloadArt() {
@@ -156,14 +157,31 @@ function tone(freq, at, dur, type = 'sine', vol = 0.13) {
   o.connect(g); g.connect(c.destination);
   o.start(t); o.stop(t + dur + 0.05);
 }
+// Plays a custom file if one is listed in config.js, otherwise the built-in beep.
+const customAudio = {};
+function playCustom(name) {
+  const src = SOUND_FILES[name];
+  if (!src) return false;
+  if (muted) return true;
+  try {
+    let a = customAudio[name];
+    if (!a) { a = customAudio[name] = new Audio(src); a.preload = 'auto'; }
+    a.currentTime = 0;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch { return false; }
+  return true;
+}
+const sound = (name, fallback) => () => { if (!playCustom(name)) fallback(); };
 export const sfx = {
-  join() { tone(660, 0, 0.1); tone(990, 0.09, 0.14); },
-  start() { tone(392, 0, 0.1); tone(523, 0.1, 0.1); tone(784, 0.2, 0.22); },
-  correct() { tone(523, 0, 0.1); tone(659, 0.09, 0.1); tone(784, 0.18, 0.22); },
-  wrong() { tone(300, 0, 0.18, 'triangle'); tone(210, 0.16, 0.26, 'triangle'); },
-  tick() { tone(900, 0, 0.05, 'square', 0.03); },
-  win() { [523, 659, 784, 1046].forEach((f, i) => tone(f, i * 0.12, 0.25)); },
-  click() { tone(720, 0, 0.05, 'sine', 0.08); },
+  join: sound('join', () => { tone(660, 0, 0.1); tone(990, 0.09, 0.14); }),
+  countdown: sound('countdown', () => { tone(587, 0, 0.14, 'triangle', 0.15); }),
+  start: sound('start', () => { tone(392, 0, 0.1); tone(523, 0.1, 0.1); tone(784, 0.2, 0.22); }),
+  correct: sound('correct', () => { tone(523, 0, 0.1); tone(659, 0.09, 0.1); tone(784, 0.18, 0.22); }),
+  wrong: sound('wrong', () => { tone(300, 0, 0.18, 'triangle'); tone(210, 0.16, 0.26, 'triangle'); }),
+  tick: sound('tick', () => { tone(900, 0, 0.05, 'square', 0.03); }),
+  win: sound('win', () => { [523, 659, 784, 1046].forEach((f, i) => tone(f, i * 0.12, 0.25)); }),
+  click: sound('click', () => { tone(720, 0, 0.05, 'sine', 0.08); }),
 };
 export const isMuted = () => muted;
 export function toggleMute() {
@@ -219,4 +237,19 @@ export function csvCell(v) {
   let s = String(v ?? '');
   if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // stop spreadsheet formula tricks from player names
   return '"' + s.replace(/"/g, '""') + '"';
+}
+
+// Count a number up (or down) on screen, like a scoreboard ticking over.
+export function countUp(el, to, { from = 0, ms = 800, delay = 0, prefix = '' } = {}) {
+  if (!el) return;
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce || from === to) { el.textContent = prefix + to; return; }
+  el.textContent = prefix + from;
+  const t0 = performance.now() + delay;
+  (function step(t) {
+    if (!el.isConnected) return;
+    const k = Math.min(1, Math.max(0, (t - t0) / ms));
+    el.textContent = prefix + Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3)));
+    if (k < 1) requestAnimationFrame(step);
+  })(performance.now());
 }

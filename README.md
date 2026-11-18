@@ -35,6 +35,28 @@ QR code joining, kick button, results download (CSV), and rejoin if a student re
 **Keep the teacher's tab open.** The teacher's browser is the game server. If it is closed or
 refreshed, the game ends. A warning pops up if you try to leave mid game.
 
+## Choices before you start
+
+On the setup screen the teacher picks how the game runs. Your choices are remembered for next time.
+
+- **Student names:** students type their own nickname, or the game gives everyone a fun random name
+  that matches their buddy (like "Brave Fox"). Random names can not repeat, and a typed name is ignored.
+- **Questions on student screens:** on by default. Turn it off and student screens show only the four
+  colored shapes with "Look at the big screen!", so everyone looks up at the board.
+- **Leaderboard between questions:** the top 10 or the top 5. It shows who moved up or down since the
+  last question, and who is on a streak (2 or more right in a row).
+- **Auto-play:** moves on by itself after each answer reveal and leaderboard, staying on each screen for
+  3, 5, 8 or 12 seconds. A button on the board pauses it. Space or Enter still moves on right away.
+- **Mix up the question order / the answer order.**
+
+Every game starts with a 3, 2, 1 countdown on the big screen and on every student device.
+
+## Custom sounds
+
+The game uses simple built-in beeps. To use your own sounds, put the files in `assets/sounds/` and list
+them in `js/config.js` (see the instructions in `assets/sounds/README.txt`). Any sound you do not
+replace keeps its beep.
+
 ## Make your own quizzes
 
 Tap **+ New quiz** in the teacher menu. Write a question, fill in 2 to 4 answers, tap the circle
@@ -127,7 +149,7 @@ js/player.js        the student's screens
 js/editor.js        the quiz maker
 js/quizzes.js       starter quizzes and quiz checking
 js/transport.js     PeerJS connection (and the same-device test mode)
-js/config.js        name, byline, player limit
+js/config.js        name, byline, player limit, custom sound files
 js/buddies.js       the list of character pictures
 assets/buddies/     the character pictures
 tools/              make-buddy.py, split-sheet.py, make-pattern.py (turn pictures into game art)

@@ -234,8 +234,8 @@ textarea { resize: vertical; }
 /* ---------- Host: leaderboard and podium ---------- */
 .board-main { flex: 1; width: 100%; max-width: 60rem; margin: 0 auto; text-align: center; }
 .board-main h1 { font-size: 2.6rem; margin: .5rem 0 1rem; }
-.board { list-style: none; padding: 0; margin: 0; display: grid; gap: .8rem; }
-.brow { display: grid; grid-template-columns: 2.6rem 3rem minmax(6rem, 14rem) 1fr auto auto; align-items: center; gap: .8rem; padding: .6rem 1rem; background: var(--white); border: var(--line); border-radius: 20px; box-shadow: 0 4px 0 var(--ink); font-size: 1.3rem; font-weight: 700; text-align: left; animation: slidein .5s both; animation-delay: var(--d, 0ms); }
+.board { list-style: none; padding: 0; margin: 0; display: grid; gap: .8rem; --gap: .8rem; }
+.brow { display: grid; grid-template-columns: 2.6rem 3rem minmax(7rem, 16rem) 1fr auto 3.6rem 3.8rem; align-items: center; gap: .8rem; padding: .6rem 1rem; background: var(--white); border: var(--line); border-radius: 20px; box-shadow: 0 4px 0 var(--ink); font-size: 1.3rem; font-weight: 700; text-align: left; animation: fadein .4s both, shiftrow 1.1s cubic-bezier(.45, 0, .2, 1) .7s both; animation-delay: var(--d, 0ms), .7s; }
 .brow .rank { display: grid; place-items: center; width: 2.4rem; height: 2.4rem; background: var(--sun); border: 3px solid var(--ink); border-radius: 50%; font-size: 1.1rem; }
 .brow .av { font-size: 2rem; line-height: 1; }
 .brow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -376,8 +376,57 @@ textarea { resize: vertical; }
   .e-opts { grid-template-columns: 1fr; }
   .opts { grid-template-columns: 1fr; }
   .brow { grid-template-columns: 2.2rem 2.2rem 1fr auto; font-size: 1rem; }
-  .brow .barwrap, .brow .streak { display: none; }
+  .brow .barwrap, .brow .streak, .brow .delta { display: none; }
   .lanes.dense, .lanes.crowded { grid-template-columns: 1fr; }
   .lane { grid-template-columns: 6rem 1fr 4.5rem; }
   .pin { font-size: 2.6rem; }
 }
+
+/* ---------- Teacher choices on the setup screen ---------- */
+.optcard { margin: 1.2rem 0; }
+.optcard h2 { margin-top: 0; }
+.optcard .check { margin: .2rem 0 .9rem; }
+.hint.tight { margin: -.5rem 0 .9rem; font-size: .8rem; }
+
+/* ---------- Countdown ---------- */
+.cd-wrap { min-height: 80dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .4rem; text-align: center; }
+.cd-star { width: 8rem; height: auto; animation: bob 1s ease-in-out infinite; }
+.cd-label { font-size: 1.7rem; font-weight: 800; margin: 0; }
+.cd-num { font-size: 10rem; font-weight: 800; line-height: 1; min-height: 1em; }
+.cd-pop { animation: cdpop 1s ease-out both; }
+
+/* ---------- Leaderboard: who moved, who is on a streak ---------- */
+.board.tight { gap: .3rem; --gap: .3rem; }
+.board.tight .brow { padding: .12rem .8rem; font-size: clamp(13px, 2.45vh, 1.3rem); gap: .6rem; }
+.board.tight .brow .av { font-size: inherit; }
+.board.tight .brow .rank { width: 1.9em; height: 1.9em; font-size: .9em; border-width: 2px; }
+.board.tight .brow .buddy { width: 2.1em; height: 2.1em; }
+.board.tight .barwrap { height: .9em; }
+.board-main:has(.board.tight) h1 { font-size: clamp(1.4rem, 4vh, 2.2rem); margin: 0 0 .4rem; }
+.board-main:has(.board.tight) { padding-bottom: .5rem; }
+.delta { font-size: .8em; font-weight: 800; padding: .05em .5em; border-radius: 999px; text-align: center; }
+.delta.up { background: var(--mint); border: 2px solid var(--ink); }
+.delta.down { background: var(--pink); border: 2px solid var(--ink); }
+.moved { font-weight: 800; margin: 0 0 .3rem; padding: .1em .9em; border: 3px solid var(--ink); border-radius: 999px; }
+.moved.up { background: var(--mint); } .moved.down { background: var(--pink); }
+.ico-flame { animation: flicker .7s ease-in-out infinite alternate; transform-origin: 50% 90%; }
+
+/* ---------- Student screens when questions show on the big screen only ---------- */
+.player.shapes .popts { grid-template-columns: 1fr 1fr; }
+.player.shapes .opt { min-height: 8.5rem; justify-content: center; }
+.player.shapes .opt:nth-child(3):last-child { grid-column: 1 / -1; }
+.player.shapes .badge { width: 4.2rem; height: 4.2rem; }
+.player.shapes .badge .shape { width: 2.4rem; height: 2.4rem; }
+.player.shapes .otext { display: none; }
+
+/* ---------- More motion ---------- */
+.opt.enter { animation: tilein .5s cubic-bezier(.3, 1.5, .5, 1) both; animation-delay: calc(var(--i, 0) * 80ms); }
+.runner.hop .buddy { animation: hop .45s ease-out; }
+.step .medal { animation: popin .6s cubic-bezier(.3, 1.6, .5, 1) .9s both; }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shiftrow { from { transform: translateY(calc(var(--shift, 0) * (100% + var(--gap, .8rem)))); } to { transform: none; } }
+@keyframes cdpop { 0% { transform: scale(2.4); opacity: 0; } 22% { transform: scale(.92); opacity: 1; } 38% { transform: scale(1.04); } 100% { transform: scale(1); opacity: .92; } }
+@keyframes tilein { from { transform: translateY(1.2rem) scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-.8rem) rotate(-6deg); } }
+@keyframes flicker { from { transform: scale(1) rotate(-4deg); } to { transform: scale(1.18) rotate(4deg); } }
+.v-board { padding-bottom: .2rem; }
