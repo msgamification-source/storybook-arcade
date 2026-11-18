@@ -83,12 +83,12 @@ function describe(p) {
 
 /**
  * players: [{ name, avatar, bestStreak, stoleCoins }] in rank order (1st place first)
- * opts: { mode, bigSteal: {thief, victim, n}, avoid: index of a plot to skip }
+ * opts: { mode, bigSteal: {thief, victim, n}, avoid: index of a plot to skip, prefer: index of a plot to use }
  */
 export function buildStory(players, opts = {}) {
   const real = players.filter(Boolean);
   const choices = PLOTS.map((_, i) => i).filter((i) => i !== opts.avoid);
-  const plotIndex = pickOne(choices.length ? choices : [0]);
+  const plotIndex = opts.prefer != null && PLOTS[opts.prefer] && opts.prefer !== opts.avoid ? opts.prefer : pickOne(choices.length ? choices : [0]);
   const plot = PLOTS[plotIndex];
 
   const others = real.slice(3);

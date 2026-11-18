@@ -173,7 +173,7 @@ textarea { resize: vertical; }
 .setup { max-width: 44rem; }
 .setup-title { display: flex; align-items: center; gap: .8rem; }
 .setup-title h1 { margin: 0; }
-.modes { border: 0; padding: 0; margin: 1rem 0; display: grid; gap: 1rem; grid-template-columns: repeat(3, 1fr); }
+.modes { border: 0; padding: 0; margin: 1rem 0; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr)); }
 .modes legend { font-weight: 800; margin-bottom: .6rem; font-size: 1.1rem; }
 .modecard { position: relative; display: block; cursor: pointer; }
 .modecard input { position: absolute; opacity: 0; inset: 0; }
@@ -553,3 +553,84 @@ textarea { resize: vertical; }
 }
 
 .qtext.long { font-size: clamp(1.15rem, 2.1vw, 2rem); line-height: 1.25; }
+
+/* ---------- Class vs. the Boss ---------- */
+.boss-ico { width: 3rem; height: 3rem; display: block; }
+.arena { flex: 1; width: 100%; max-width: 84rem; margin: 0 auto; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .4rem; min-height: 0; }
+.v-boss { padding-bottom: .4rem; height: 100dvh; min-height: 0; overflow: hidden; }
+.boss-stage { display: grid; justify-items: center; gap: .35rem; }
+.bubble { max-width: 36rem; text-align: center; font-weight: 700; padding: .35rem 1.1rem; background: var(--white); border: var(--line); border-radius: 18px; box-shadow: 0 3px 0 var(--ink); min-height: 2.3em; font-size: clamp(1rem, 2.4vh, 1.3rem); }
+.boss-wrap { position: relative; width: clamp(8rem, 30vh, 19rem); aspect-ratio: 1; }
+.boss-img { width: 100%; height: 100%; object-fit: contain; display: block; animation: bossbob 3s ease-in-out infinite; user-select: none; }
+.boss-img.hit { animation: bosshit .28s ease-out; }
+.boss-img.slam { animation: bossslam .8s ease-out; }
+.boss-wrap.defeated .boss-img { animation: bossdie 2s ease-in forwards; }
+.dmg-layer { position: absolute; inset: 0; pointer-events: none; }
+.dmg { position: absolute; top: 20%; font-size: 1.7rem; font-weight: 800; color: var(--white); -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; animation: floatup .9s ease-out forwards; }
+.dmg.big { font-size: 3.4rem; color: var(--sun); animation-duration: 1.2s; }
+.slam-text { position: absolute; left: -35%; right: -35%; top: 18%; text-align: center; font-size: clamp(2rem, 7vh, 4.4rem); font-weight: 800; color: var(--sun); -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; pointer-events: none; z-index: 3; }
+.slam-text.go { animation: slamtext 1.5s ease-out both; }
+.boss-name { font-weight: 800; font-size: clamp(1.1rem, 3vh, 1.8rem); }
+.hpbar { position: relative; width: min(100%, 44rem); height: clamp(1.7rem, 4.6vh, 2.5rem); background: var(--white); border: var(--line); border-radius: 999px; overflow: hidden; box-shadow: 0 3px 0 var(--ink); }
+.hpbar i { position: absolute; inset: 0 auto 0 0; transition: width .5s ease, background .3s; }
+.hpbar i.ok { background: var(--mint); } .hpbar i.mid { background: var(--sun); } .hpbar i.low { background: var(--pink); }
+.hpbar span { position: relative; display: block; text-align: center; font-weight: 800; font-size: clamp(.9rem, 2.4vh, 1.2rem); line-height: clamp(1.4rem, 4vh, 2.2rem); }
+.energy { display: flex; align-items: center; gap: .6rem; font-weight: 700; width: min(100%, 44rem); font-size: .95rem; }
+.energy .ico { width: 1.3em; height: 1.3em; }
+.energybar { flex: 1; height: 1rem; border: 3px solid var(--ink); border-radius: 999px; background: var(--white); overflow: hidden; }
+.energybar i { display: block; height: 100%; width: 0; background: var(--sky); transition: width .3s; }
+.team { display: flex; flex-wrap: wrap; gap: .3rem .6rem; justify-content: center; align-content: flex-start; overflow: hidden; }
+.mate { display: grid; justify-items: center; width: 5.2rem; transition: opacity .3s; }
+.mate .av { font-size: inherit; }
+.mate .buddy { width: 3.6rem; height: 3.6rem; }
+.mate .nm { font-size: .72rem; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mate.swing .buddy { animation: swing .35s ease-out; }
+.mate.off { opacity: .4; }
+.team.many .mate { width: 4.4rem; } .team.many .buddy { width: 2.9rem; height: 2.9rem; }
+.team.crowd .mate { width: 3.4rem; } .team.crowd .buddy { width: 2.4rem; height: 2.4rem; } .team.crowd .nm { display: none; }
+.arena.packed .boss-wrap { width: clamp(5.5rem, 21vh, 13rem); }
+.arena.packed .bubble { min-height: 0; padding: .15rem .9rem; }
+.arena.packed .boss-name { display: none; }
+.team.huge .mate { width: 2.5rem; } .team.huge .buddy { width: 2.2rem; height: 2.2rem; }
+.bossbar { display: flex; align-items: center; gap: .5rem; margin: .1rem 0 .4rem; }
+.bossbar img { width: 2.8rem; height: 2.8rem; flex: none; }
+.bossbar .bb { flex: 1; height: 1.2rem; background: var(--white); border: var(--line); border-radius: 999px; overflow: hidden; }
+.bossbar .bb i { display: block; height: 100%; background: var(--pink); transition: width .5s ease; }
+.bossbar b { min-width: 2.9rem; text-align: right; font-size: .9rem; }
+.banner.slam { background: var(--sun); }
+.boss-banner { display: inline-flex; align-items: center; gap: .6rem; margin: 0 auto .6rem; padding: .35rem 1.2rem .35rem .5rem; border: var(--line); border-radius: 999px; font-weight: 800; box-shadow: var(--pop); font-size: 1.15rem; }
+.boss-banner.win { background: var(--mint); } .boss-banner.lose { background: var(--pink); }
+.boss-banner img { width: 3.2rem; height: 3.2rem; }
+@keyframes bossbob { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-.5rem) rotate(1deg); } }
+@keyframes bosshit { 0% { transform: translateX(0); filter: none; } 25% { transform: translateX(-.9rem) rotate(-3deg); filter: brightness(1.35); } 60% { transform: translateX(.6rem) rotate(2deg); } 100% { transform: translateX(0); filter: none; } }
+@keyframes bossslam { 0% { transform: scale(1); } 20% { transform: scale(1.18) rotate(-6deg); filter: brightness(1.5); } 45% { transform: scale(.9) rotate(5deg); } 70% { transform: translateX(-.8rem) rotate(-3deg); } 100% { transform: scale(1); filter: none; } }
+@keyframes bossdie { 0% { transform: scale(1) rotate(0); opacity: 1; } 30% { transform: scale(1.15) rotate(-10deg); } 100% { transform: scale(.1) rotate(540deg); opacity: 0; } }
+@keyframes floatup { from { transform: translateY(0) scale(.8); opacity: 1; } to { transform: translateY(-5rem) scale(1.1); opacity: 0; } }
+@keyframes slamtext { 0% { transform: scale(.3) rotate(-14deg); opacity: 0; } 18% { transform: scale(1.25) rotate(-6deg); opacity: 1; } 35% { transform: scale(1) rotate(-6deg); } 80% { opacity: 1; } 100% { transform: scale(1.05) rotate(-6deg); opacity: 0; } }
+@keyframes swing { 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(-.9rem) scale(1.18) rotate(8deg); } 100% { transform: translateY(0) scale(1); } }
+
+/* ---------- Podium: always fits one screen ---------- */
+.v-podium { height: 100dvh; min-height: 0; overflow: hidden; padding-bottom: .6rem; }
+.v-podium .topbar { flex-wrap: nowrap; gap: .5rem; padding-bottom: .3rem; }
+.v-podium .topbar .row { flex-wrap: nowrap; gap: .4rem; justify-content: flex-end; }
+.v-podium .topbar .btn { font-size: .82rem; padding: .4em .85em; white-space: nowrap; box-shadow: 0 3px 0 var(--ink); }
+.v-podium .topbar .chip { font-size: .85rem; white-space: nowrap; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.v-podium .topbar .btn .ico { width: 1.1em; height: 1.1em; }
+.v-podium .podium-main { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.v-podium .podium-main h1 { font-size: clamp(1.7rem, 5.2vh, 2.8rem); margin: 0 0 .2rem; }
+.v-podium .boss-banner { font-size: clamp(.95rem, 2.4vh, 1.15rem); margin: 0 auto .3rem; padding-top: .15rem; padding-bottom: .15rem; }
+.v-podium .boss-banner img { width: clamp(2rem, 5vh, 3.2rem); height: clamp(2rem, 5vh, 3.2rem); }
+.v-podium .podium { margin: .3rem auto; flex: 0 0 auto; }
+.v-podium .spot-av { font-size: clamp(2rem, 6.6vh, 3.4rem); }
+.v-podium .spot-1 .spot-av { font-size: clamp(2.6rem, 9vh, 4.4rem); }
+.v-podium .spot-nm { font-size: clamp(.95rem, 2.4vh, 1.15rem); }
+.v-podium .spot-sc { font-size: clamp(.8rem, 2vh, 1rem); margin-bottom: .2rem; }
+.v-podium .step { font-size: clamp(1.4rem, 4.2vh, 2.2rem); }
+.v-podium .step .medal { width: clamp(2.4rem, 7vh, 4.2rem); height: clamp(2.4rem, 7vh, 4.2rem); }
+.v-podium .spot-1 .step { height: clamp(6rem, 25vh, 12.5rem); }
+.v-podium .spot-2 .step { height: clamp(5rem, 20vh, 9.5rem); }
+.v-podium .spot-3 .step { height: clamp(4.2rem, 16vh, 8rem); }
+.v-podium .awards { margin: .5rem auto 0; gap: .4rem; }
+.v-podium .awards li { font-size: clamp(.8rem, 2vh, 1rem); padding: .2rem .8rem; }
+.v-podium .awards .ico { width: 1.3rem; height: 1.3rem; }
+.v-podium .rest { margin: .6rem auto 0; overflow-y: auto; min-height: 0; flex: 0 1 auto; padding: 0 .3rem .4rem; }

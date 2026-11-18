@@ -24,6 +24,7 @@ export const PEER_OPTIONS = Object.assign({ debug: 0 }, window.QUIZ_PARTY_PEER_O
 //   win        the podium
 //   click      tapping an answer
 //   coin       finding coins behind a gate (Treasure Gates)
+//   hit        a student hits the boss (Class vs. the Boss)
 //   steal      a steal (Treasure Gates)
 //   jackpot    finding the jackpot (Treasure Gates)
 export const SOUND_FILES = {

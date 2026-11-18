@@ -15,6 +15,7 @@ The names you can use:
   win        the podium
   click      tapping an answer
   coin       finding coins behind a gate (Treasure Gates)
+  hit        a student hits the boss (Class vs. the Boss)
   steal      a steal (Treasure Gates)
   jackpot    finding the jackpot (Treasure Gates)
 

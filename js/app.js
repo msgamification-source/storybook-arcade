@@ -7,6 +7,7 @@ import {
 import { APP_NAME, BYLINE } from './config.js';
 import { allQuizzes, findQuiz, copyOf, blankQuiz, deleteMine, normalizeQuiz, upsertMine, loadMine } from './quizzes.js';
 import { openEditor } from './editor.js';
+import { BOSSES } from './bosses.js';
 import { hostGame, DEFAULT_OPTS } from './host.js';
 import { joinGame, resumeSession, leaveGame } from './player.js';
 
@@ -178,12 +179,28 @@ function renderSetup(quiz) {
           <label class="modecard"><input type="radio" name="mode" value="gates">
             <span class="modebody"><span class="modeicon">${icon('mask')}</span><b>Treasure Gates</b>
             <span>Every right answer opens a gate: coins, a shield, a jackpot, or a sneaky steal from a classmate.</span></span></label>
+          <label class="modecard"><input type="radio" name="mode" value="boss">
+            <span class="modebody"><span class="modeicon"><img class="boss-ico" src="assets/bosses/gobbler.png" alt=""></span><b>Class vs. the Boss</b>
+            <span>The whole class teams up to defeat a boss before time runs out. Every right answer is a hit.</span></span></label>
         </fieldset>
         <label class="field" id="race-opts" hidden><span>How long should it last?</span>
           <select name="minutes">${[3, 5, 8, 10, 15].map((m) => html`<option value="${m}" ${m === 5 ? 'selected' : ''}>${m} minutes</option>`)}</select></label>
 
         <section class="card optcard">
           <h2>Your choices</h2>
+          <div id="boss-opts" hidden>
+            <label class="field"><span>Which boss?</span>
+              <select name="boss">
+                <option value="random" ${sel('random', o.boss)}>Surprise me</option>
+                ${BOSSES.map((b) => html`<option value="${b.id}" ${sel(b.id, o.boss)}>${b.name}</option>`)}
+              </select></label>
+            <label class="field"><span>How strong is the boss?</span>
+              <select name="strength">
+                <option value="easy" ${sel('easy', o.strength)}>Easy: a smaller boss</option>
+                <option value="medium" ${sel('medium', o.strength)}>Medium: a good challenge</option>
+                <option value="hard" ${sel('hard', o.strength)}>Hard: a big boss that heals when someone misses</option>
+              </select></label>
+          </div>
           <div id="gate-opts" hidden>
             <label class="check"><input type="checkbox" name="steal" ${o.steal ? 'checked' : ''}>
               <span>Allow stealing. Players can take some coins from a classmate who is ahead of them. A shield blocks it.</span></label>
@@ -228,6 +245,8 @@ function readHostOptions(f) {
     shuffleQ: f.elements.shuffleQ.checked,
     shuffleA: f.elements.shuffleA.checked,
     steal: f.elements.steal.checked,
+    boss: f.elements.boss.value,
+    strength: f.elements.strength.value,
   };
 }
 
@@ -261,6 +280,7 @@ app.addEventListener('change', (e) => {
     byId('race-opts').hidden = e.target.value === 'live';
     byId('live-opts').hidden = e.target.value !== 'live';
     byId('gate-opts').hidden = e.target.value !== 'gates';
+    byId('boss-opts').hidden = e.target.value !== 'boss';
   } else if (e.target.name === 'auto') byId('delay-row').hidden = !e.target.checked;
   else if (e.target.id === 'imp' && e.target.files[0]) { importFile(e.target.files[0]); e.target.value = ''; }
 });

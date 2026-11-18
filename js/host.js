@@ -9,6 +9,7 @@ import { openHost, friendlyError } from './transport.js';
 import { buildStory, storyHtml, plainText, speak, canSpeak, stopSpeaking } from './story.js';
 import { newStats, recordAnswer, recordNone, buildReport, reportCsv, BAND_LABEL, CHECK_IN_BELOW, CHECK_IN_MIN_ANSWERS } from './report.js';
 import { registerTemp } from './quizzes.js';
+import { BOSSES, bossById, STRENGTH, AVG_HIT } from './bosses.js';
 import { MAX_PLAYERS } from './config.js';
 
 let G = null; // the current game, or null
@@ -31,6 +32,8 @@ export const DEFAULT_OPTS = {
   shuffleQ: false,       // mix up the question order
   shuffleA: false,       // mix up the answer order
   steal: true,           // Treasure Gates: allow stealing coins from classmates
+  boss: 'random',        // Class vs. the Boss: which boss ('random' picks one)
+  strength: 'medium',    // Class vs. the Boss: easy, medium or hard
 };
 
 const ADJECTIVES = ['Happy', 'Brave', 'Sparkly', 'Zippy', 'Cosmic', 'Jolly', 'Cozy', 'Mighty', 'Clever', 'Bouncy',
@@ -62,7 +65,7 @@ function prepareQuiz(quiz, o) {
   return { ...quiz, questions: qs };
 }
 const prettyPin = (pin) => pin.slice(0, 3) + ' ' + pin.slice(3);
-const MODE_LABEL = { live: 'Live Quiz', race: 'Race', gates: 'Treasure Gates' };
+const MODE_LABEL = { live: 'Live Quiz', race: 'Race', gates: 'Treasure Gates', boss: 'Class vs. the Boss' };
 
 function ranked() {
   const l = list().sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name));
@@ -113,7 +116,12 @@ export async function hostGame({ quiz, mode, local, minutes, opts }) {
     qi: -1, answers: new Map(), qStart: 0, limit: 20, counts: [], ticker: 0, allTimer: 0,
     finishCount: 0, raceEnd: 0, feed: [], feedId: 0, gatesTimer: 0, bigSteal: null,
     story: null, storyPage: 0, storyOn: false, stats: newStats(), report: null,
+    baseQuiz: quiz, boss: null, bossTimer: 0,
   };
+  if (mode === 'boss') {
+    const def = o.boss === 'random' ? BOSSES[Math.floor(Math.random() * BOSSES.length)] : bossById(o.boss);
+    G.boss = { ...def, hp: 0, max: 0, energy: 0, slams: 0, hits: 0, won: false, lastHit: null, strength: STRENGTH[o.strength] ? o.strength : 'medium', perPlayer: 0, heal: 0, phase: '', sent: 0, sentHp: -1 };
+  }
   transport.onMessage = onMessage;
   transport.onClose = onClose;
   transport.onTrouble = () => toast('Connection hiccup. If a player is stuck, ask them to refresh the page.');
@@ -123,7 +131,7 @@ export async function hostGame({ quiz, mode, local, minutes, opts }) {
 
 export function stopHosting() {
   if (!G) return;
-  clearInterval(G.ticker); clearTimeout(G.allTimer); clearTimeout(G.gatesTimer); clearAuto();
+  clearInterval(G.ticker); clearTimeout(G.allTimer); clearTimeout(G.gatesTimer); clearTimeout(G.bossTimer); clearAuto();
   list().forEach((p) => p.race && clearTimeout(p.race.timer));
   try { G.transport.broadcast({ t: 'bye' }); } catch { /* ignore */ }
   const t = G.transport;
@@ -185,6 +193,7 @@ function onJoin(conn, m) {
     G.players.set(p.pid, p);
   }
   G.conns.set(conn, p.pid);
+  if (G.mode === 'boss' && G.phase === 'race' && !G.boss.won && p.attempts === 0 && !p.race) { G.boss.max += G.boss.perPlayer; G.boss.hp += G.boss.perPlayer; }
   send(p, { t: 'welcome', pid: p.pid, name: p.name, avatar: p.avatar, mode: G.mode, title: G.quiz.title });
   snapshot(p);
   sfx.join();
@@ -214,7 +223,7 @@ function rosterChanged() {
   if (!G) return;
   if (G.phase === 'lobby') updateLobby();
   else if (G.phase === 'question') { updateAnswered(); checkAllAnswered(); }
-  else if (G.phase === 'race') { list().forEach(updateLane); scheduleGates(); checkRaceOver(); }
+  else if (G.phase === 'race') { list().forEach(updateLane); scheduleGates(); scheduleBoss(); checkRaceOver(); }
 }
 
 // ---------- Lobby ----------
@@ -539,16 +548,17 @@ function startRace() {
   G.phase = 'race';
   G.raceEnd = Date.now() + G.minutes * 60000;
   G.finishCount = 0;
+  if (G.mode === 'boss') initBoss();
   list().forEach(initRace);
   connected().forEach(startRaceFor);
-  if (G.mode === 'gates') renderGates(); else renderRace();
+  if (G.mode === 'gates') renderGates(); else if (G.mode === 'boss') renderBoss(); else renderRace();
   G.ticker = setInterval(raceTick, 250);
   sfx.start();
 }
 
 function startRaceFor(p) {
   initRace(p);
-  send(p, { t: 'rs', mode: G.mode, total: nQ(), secs: Math.max(0, Math.round((G.raceEnd - Date.now()) / 1000)) });
+  send(p, { t: 'rs', mode: G.mode, total: nQ(), secs: Math.max(0, Math.round((G.raceEnd - Date.now()) / 1000)), boss: G.mode === 'boss' ? bossMsg() : undefined });
   const cur = p.race.cur;
   if (G.mode === 'gates' && cur && cur.gateOpen && !cur.gatePicked) send(p, { t: 'gate', s: cur.s, coins: p.score }); // they still owe a gate pick
   else if (p.race.done) send(p, finishMsg(p));
@@ -591,6 +601,9 @@ function onRaceAnswer(p, m) {
       cur.doubled = p.double;
       if (p.double) { gain *= 2; p.double = false; }
       cur.gateOpen = true; // they now get to pick a gate
+    } else if (G.mode === 'boss') {
+      gain = G.boss.won ? 0 : 10 + Math.min(p.streak - 1, 4) * 2;   // damage to the boss
+      if (gain) hitBoss(p, gain);
     } else {
       gain = 100 + Math.min(p.streak - 1, 5) * 20;
       if (!r.queue.length) { r.done = true; r.place = ++G.finishCount; bonus = [0, 300, 200, 100][r.place] || 0; }
@@ -599,12 +612,13 @@ function onRaceAnswer(p, m) {
   } else {
     p.streak = 0;
     r.queue.push(r.queue.shift()); // missed questions come back around later
+    if (G.mode === 'boss' && G.boss.heal) healBoss(G.boss.heal);
   }
   r.nextAt = Date.now() + (ok ? 600 : 1800);
   send(p, {
     t: 'rr', s: cur.s, ok, correct: cur.order.indexOf(q.correct), gain, bonus,
     score: p.score, streak: p.streak, done: r.correct, total: nQ(), finished: r.done, place: r.place,
-    gate: G.mode === 'gates' && ok, doubled: !!cur.doubled,
+    gate: G.mode === 'gates' && ok, doubled: !!cur.doubled, dmg: G.mode === 'boss' && ok ? gain : 0,
   });
   updateLane(p); scheduleGates();
   if (r.done) { sfx.correct(); checkRaceOver(); }
@@ -815,9 +829,163 @@ function updateGates() {
   board.dataset.feed = G.feedId;
 }
 
+// ---------- Class vs. the Boss ----------
+// One big boss, one shared health bar. Every right answer hits it. Team power builds with every hit
+// and unleashes a Mega Slam. If the clock runs out first, the boss gets away.
+function initBoss() {
+  const b = G.boss;
+  const st = STRENGTH[b.strength] || STRENGTH.medium;
+  b.perPlayer = Math.max(10, Math.round((st.hits * (G.minutes / 5) * AVG_HIT) / 10) * 10); // health each student adds
+  const n = Math.max(1, connected().length);
+  b.max = b.perPlayer * n; b.hp = b.max; b.energy = 0; b.heal = st.heal; b.phase = '';
+}
+
+const bossPct = () => (G.boss.max ? Math.max(0, Math.round((G.boss.hp / G.boss.max) * 100)) : 0);
+const bossMsg = () => ({ id: G.boss.id, name: G.boss.name, short: G.boss.short, hp: G.boss.hp, max: G.boss.max });
+const slamAt = () => Math.max(10, Math.round(connected().length * 1.5)); // how many hits fill the team power bar
+
+function hitBoss(p, dmg) {
+  const b = G.boss;
+  if (b.won) return;
+  b.hp = Math.max(0, b.hp - dmg); b.hits++; b.energy++;
+  arenaHit(p, dmg);
+  if (b.energy >= slamAt() && b.hp > 0) {
+    b.energy = 0; b.slams++;
+    const slam = Math.max(10, Math.round((b.max * 0.04) / 10) * 10);
+    b.hp = Math.max(0, b.hp - slam);
+    arenaSlam(slam);
+    connected().forEach((q) => send(q, { t: 'bm', dmg: slam, hp: b.hp, max: b.max }));
+  }
+  if (b.hp <= 0) {
+    b.won = true; b.lastHit = p.name;
+    arenaDefeat();
+    setTimeout(() => { if (G && G.phase === 'race') finishGame(); }, 2400);
+  }
+  scheduleBoss();
+}
+function healBoss(n) {
+  const b = G.boss;
+  if (b.won) return;
+  b.hp = Math.min(b.max, b.hp + n);
+  scheduleBoss();
+}
+
+function renderBoss() {
+  const b = G.boss;
+  setScreen('screen host v-boss', html`
+    <header class="topbar">
+      <div class="chip">${G.quiz.emoji} ${G.quiz.title} <span class="chip-sub">Class vs. the Boss</span></div>
+      <div class="clock" id="clock">${mmss(G.minutes * 60)}</div>
+      <button class="btn btn-ghost" data-action="h-end">End now</button>
+    </header>
+    <main class="arena">
+      <section class="boss-stage">
+        <div class="bubble" id="taunt" role="status"></div>
+        <div class="boss-wrap" id="bosswrap">
+          <img class="boss-img" id="bossimg" src="assets/bosses/${b.id}.png" alt="${b.name}" draggable="false">
+          <div class="dmg-layer" id="dmglayer"></div>
+          <div class="slam-text" id="slamtext" hidden>MEGA SLAM!</div>
+        </div>
+        <div class="boss-name">${b.name}</div>
+        <div class="hpbar" role="progressbar" aria-label="Boss health"><i id="hpfill"></i><span id="hptext"></span></div>
+        <div class="energy"><span>${icon('pencil')} Team power</span><div class="energybar"><i id="enfill"></i></div></div>
+      </section>
+      <section class="team" id="team" aria-label="The class"></section>
+    </main>`);
+  updateBoss();
+}
+
+// Redraw the health bar and team (at most every 150 ms), and tell student devices about the health twice a second.
+function scheduleBoss() {
+  if (!G || G.mode !== 'boss' || G.phase !== 'race' || G.bossTimer) return;
+  G.bossTimer = setTimeout(() => { if (!G) return; G.bossTimer = 0; updateBoss(); }, 150);
+}
+
+function updateBoss() {
+  const b = G && G.boss;
+  if (!b || !byId('hpfill')) return;
+  const pct = bossPct();
+  const fill = byId('hpfill');
+  fill.style.width = pct + '%';
+  fill.dataset.hp = b.hp; fill.dataset.max = b.max;
+  fill.className = pct > 50 ? 'ok' : pct > 25 ? 'mid' : 'low';
+  byId('hptext').textContent = `${Math.max(0, b.hp)} / ${b.max}`;
+  byId('enfill').style.width = Math.min(100, (b.energy / slamAt()) * 100) + '%';
+  // the boss talks as it gets hurt
+  const phase = b.won ? 'dead' : pct > 85 ? 'start' : pct > 35 ? 'hurt' : 'low';
+  if (phase !== b.phase) { b.phase = phase; byId('taunt').textContent = b.taunts[phase]; }
+  // the team
+  const team = byId('team');
+  const have = new Map([...team.children].map((e) => [e.dataset.pid, e]));
+  list().forEach((p) => {
+    let el = have.get(p.pid);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'mate'; el.dataset.pid = p.pid;
+      el.innerHTML = html`<span class="av">${avatarHtml(p.avatar)}</span><small class="nm">${p.name}</small>`.__raw;
+      team.appendChild(el);
+    }
+    have.delete(p.pid);
+    el.classList.toggle('off', !p.connected);
+  });
+  have.forEach((e) => e.remove());
+  team.classList.toggle('many', list().length > 10);
+  team.classList.toggle('crowd', list().length > 18);
+  team.classList.toggle('huge', list().length > 36);
+  team.parentElement.classList.toggle('packed', list().length > 36);
+  // student devices
+  if (Date.now() - b.sent > 700 && b.sentHp !== b.hp) {
+    b.sent = Date.now(); b.sentHp = b.hp;
+    connected().forEach((p) => send(p, { t: 'bh', hp: b.hp, max: b.max }));
+  } else if (b.sentHp !== b.hp) {
+    G.bossTimer = setTimeout(() => { if (!G) return; G.bossTimer = 0; updateBoss(); }, 400);
+  }
+}
+
+let lastHitSound = 0;
+function arenaHit(p, dmg) {
+  const layer = byId('dmglayer');
+  if (!layer) return;
+  const img = byId('bossimg');
+  if (img) { img.classList.remove('hit'); void img.offsetWidth; img.classList.add('hit'); }
+  if (layer.children.length < 9) {
+    const d = document.createElement('div');
+    d.className = 'dmg'; d.textContent = '-' + dmg; d.style.left = 15 + Math.random() * 65 + '%';
+    layer.appendChild(d);
+    setTimeout(() => d.remove(), 900);
+  }
+  const m = byId('team') && byId('team').querySelector(`[data-pid="${CSS.escape(p.pid)}"]`);
+  if (m) { m.classList.remove('swing'); void m.offsetWidth; m.classList.add('swing'); }
+  if (Date.now() - lastHitSound > 140) { lastHitSound = Date.now(); sfx.hit(); }
+}
+function arenaSlam(n) {
+  const t = byId('slamtext'); const img = byId('bossimg'); const layer = byId('dmglayer');
+  if (t) { t.textContent = 'MEGA SLAM!'; t.hidden = false; t.classList.remove('go'); void t.offsetWidth; t.classList.add('go'); setTimeout(() => { if (t) t.hidden = true; }, 1500); }
+  if (img) { img.classList.remove('slam'); void img.offsetWidth; img.classList.add('slam'); }
+  if (layer) { const d = document.createElement('div'); d.className = 'dmg big'; d.textContent = '-' + n; d.style.left = '40%'; layer.appendChild(d); setTimeout(() => d.remove(), 1200); }
+  sfx.jackpot();
+}
+function arenaDefeat() {
+  const w = byId('bosswrap');
+  if (w) w.classList.add('defeated');
+  updateBoss();
+  confetti(3500); sfx.win();
+}
+
+actions['h-rematch'] = () => {
+  if (!G) return;
+  const quiz = G.baseQuiz;
+  stopHosting();
+  nav.setup(quiz);
+};
+
 // ---------- The end ----------
 function endMsg(p) {
-  return { t: 'end', rank: p.rank, of: G.players.size, score: p.score, correct: p.correct, total: nQ(), mode: G.mode };
+  const b = G.boss;
+  return {
+    t: 'end', rank: p.rank, of: G.players.size, score: p.score, correct: p.correct, total: nQ(), mode: G.mode,
+    boss: b ? { id: b.id, name: b.name, short: b.short, won: b.won, pct: b.max ? Math.round((b.hp / b.max) * 100) : 0 } : undefined,
+  };
 }
 
 function finishGame() {
@@ -834,6 +1002,8 @@ function awardsFor(l) {
   if (streak && streak.bestStreak >= 3) out.push({ icon: 'flame', text: `Best streak: ${streak.name} (${streak.bestStreak} right in a row)` });
   const thief = l.slice().sort((a, b) => b.stoleCoins - a.stoleCoins)[0];
   if (G.mode === 'gates' && thief && thief.stoleCoins > 0) out.push({ icon: 'mask', text: `Master thief: ${thief.name} (${thief.stoleCoins} coins stolen)` });
+  if (G.boss && G.boss.won && G.boss.lastHit) out.push({ icon: 'trophy', text: `Final blow: ${G.boss.lastHit}` });
+  if (G.boss && G.boss.slams) out.push({ icon: 'pencil', text: `${G.boss.slams} Mega ${G.boss.slams === 1 ? 'Slam' : 'Slams'} from team power` });
   return out;
 }
 
@@ -841,7 +1011,7 @@ function renderPodium(l, quiet = false) {
   const [a, b, c] = l;
   const spot = (p, place) => (p ? html`
     <div class="spot spot-${place}">
-      <div class="spot-av">${avatarHtml(p.avatar)}</div><div class="spot-nm">${p.name}</div><div class="spot-sc">${p.score}</div>
+      <div class="spot-av">${avatarHtml(p.avatar)}</div><div class="spot-nm">${p.name}</div><div class="spot-sc">${p.score}${G.mode === 'boss' ? ' damage' : ''}</div>
       <div class="step">${medalImg(place)}<span>${place}</span></div>
     </div>` : html`<div class="spot spot-${place} empty"></div>`);
   setScreen('screen host v-podium', html`
@@ -851,11 +1021,14 @@ function renderPodium(l, quiet = false) {
         ${l.length ? html`<button class="btn btn-pink" data-action="h-story">${icon('book')} Story time!</button>` : ''}
         ${G.stats.q.size ? html`<button class="btn btn-mint" data-action="h-report">${icon('trophy')} Skills report</button>` : ''}
         <button class="btn btn-sky" data-action="h-csv">Download results</button>
+        <button class="btn btn-sun" data-action="h-rematch">${G.boss ? 'Rematch' : 'Play again'}</button>
         <button class="btn" data-action="h-exit">Finish</button>
       </div>
     </header>
     <main class="podium-main">
-      <h1>${l.length ? 'Great game!' : 'Game over'}</h1>
+      <h1>${G.boss ? (G.boss.won ? 'Victory!' : 'So close!') : l.length ? 'Great game!' : 'Game over'}</h1>
+      ${G.boss ? html`<p class="boss-banner ${G.boss.won ? 'win' : 'lose'}"><img src="assets/bosses/${G.boss.id}.png" alt="">
+        <span>${G.boss.won ? `The class defeated ${G.boss.name}!` : `${G.boss.name} got away with ${bossPct()}% health left. Try again!`}</span></p>` : ''}
       <div class="podium">${spot(b, 2)}${spot(a, 1)}${spot(c, 3)}</div>
       ${awardsFor(l).length ? html`<ul class="awards">${awardsFor(l).map((w) => html`<li>${icon(w.icon)}<span>${w.text}</span></li>`)}</ul>` : ''}
       ${l.length > 3 ? html`
@@ -873,7 +1046,9 @@ function storyMsg() {
   return { t: 'sp', i, n: n + 1, title: st.title, text: st.pages[i].text, cast: st.pages[i].cast.map((p) => p.avatar) };
 }
 
-function storyOptions() { return { mode: G.mode, bigSteal: G.bigSteal, avoid: G.story ? G.story.plot : undefined }; }
+function storyOptions() {
+  return { mode: G.mode, bigSteal: G.bigSteal, avoid: G.story ? G.story.plot : undefined, prefer: G.boss && G.boss.id === 'gobbler' && !G.story ? 0 : undefined };
+}
 
 actions['h-story'] = () => {
   if (!G || G.phase !== 'end' || !list().length) return;

@@ -7,6 +7,7 @@ import {
 } from './util.js';
 import { connectToGame, friendlyError } from './transport.js';
 import { storyHtml, speak, canSpeak, stopSpeaking } from './story.js';
+import { bossById } from './bosses.js';
 
 const KEY = 'quizparty.player';
 const PRAISE = ['Nice!', 'You got it!', 'Awesome!', 'Brilliant!', 'Yes!', 'Great job!'];
@@ -108,7 +109,10 @@ function onMsg(m) {
     case 'q': S.phase = 'question'; S.q = m; S.chosen = null; S.qEnds = Date.now() + m.left * 1000; renderQuestion(); break;
     case 'ack': S.chosen = m.c; renderLocked(); break;
     case 'r': S.phase = 'result'; renderResult(m); break;
-    case 'rs': S.race = { total: m.total, ends: Date.now() + m.secs * 1000 }; S.phase = 'race'; if (m.mode) S.mode = m.mode; break;
+    case 'rs': S.race = { total: m.total, ends: Date.now() + m.secs * 1000 }; S.phase = 'race'; if (m.mode) S.mode = m.mode;
+      S.boss = m.boss ? { ...m.boss, id: bossById(m.boss.id).id } : null; break;
+    case 'bh': if (S.boss) { S.boss.hp = m.hp; S.boss.max = m.max; updateBossBar(); } break;
+    case 'bm': onSlam(m); break;
     case 'rq': S.coins = m.score; S.rq = m; S.rpick = null; S.rfb = null; renderRaceQ(); break;
     case 'rr': S.coins = m.score; S.rfb = m; renderRaceQ(); break;
     case 'gate': S.coins = m.coins; renderGate(m.s); break;
@@ -261,13 +265,14 @@ function renderRaceQ() {
     return 'dim';
   };
   setScreen('screen player question race', html`
-    ${header(html`<span class="chip">${icon('coin')} <span id="mycoins">${score}</span></span><span class="clock" id="rclock"></span>`)}
-    <div class="progress" aria-label="${done} of ${m.total} done"><i style="width:${pct}%"></i><span>${done} / ${m.total}</span></div>
+    ${header(html`<span class="chip">${icon(S.mode === 'boss' ? 'pencil' : 'coin')} <span id="mycoins">${score}</span></span><span class="clock" id="rclock"></span>`)}
+    ${S.mode === 'race' ? html`<div class="progress" aria-label="${done} of ${m.total} done"><i style="width:${pct}%"></i><span>${done} / ${m.total}</span></div>`
+      : S.mode === 'boss' && S.boss ? bossBarHtml() : ''}
     <h1 class="pq">${m.text}</h1>
     <div class="popts">${m.options.map((o, i) => optButton(o, i, state(i), S.rpick != null || fb ? 'disabled' : ''))}</div>
     <div class="feedback">
       ${fb ? (fb.ok
-        ? html`<b class="good">${fb.finished ? 'You finished the race!' : pick(PRAISE)} +${fb.gain + fb.bonus}</b>${streak >= 3 ? html` <span>${icon('flame')} ${streak}</span>` : ''}`
+        ? html`<b class="good">${fb.finished ? 'You finished the race!' : pick(PRAISE)} ${S.mode === 'boss' ? (fb.dmg ? `-${fb.dmg} HP to the ${S.boss ? S.boss.short : 'boss'}!` : 'Nice one!') : `+${fb.gain + fb.bonus}`}</b>${streak >= 3 ? html` <span>${icon('flame')} ${streak}</span>` : ''}`
         : html`<b class="bad">Not quite! That one will come back around.</b><button class="btn btn-sky" data-action="p-next">Got it</button>`)
         : (S.rpick != null ? html`<span class="hint">Checking...</span>` : '')}
     </div>`);
@@ -290,6 +295,32 @@ actions['p-next'] = () => {
     setScreen('screen player center', html`<div class="loading">${mascot('bob')}</div>`);
   }
 };
+
+// ----- Class vs. the Boss -----
+const bossPctOf = () => (S.boss && S.boss.max ? Math.max(0, Math.round((S.boss.hp / S.boss.max) * 100)) : 0);
+const bossBarHtml = () => html`
+  <div class="bossbar" aria-label="Boss health">
+    <img src="assets/bosses/${S.boss.id}.png" alt="">
+    <div class="bb"><i id="bossfill" style="width:${bossPctOf()}%"></i></div>
+    <b id="bosshp">${bossPctOf()}%</b>
+  </div>`;
+function updateBossBar() {
+  const f = byId('bossfill'); const t = byId('bosshp');
+  if (f) f.style.width = bossPctOf() + '%';
+  if (t) t.textContent = bossPctOf() + '%';
+}
+// The team power bar filled up: everyone gets a big hit in.
+function onSlam(m) {
+  if (S.boss) { S.boss.hp = m.hp; S.boss.max = m.max; updateBossBar(); }
+  document.querySelectorAll('.banner').forEach((x) => x.remove());
+  const b = document.createElement('div');
+  b.className = 'banner slam';
+  b.setAttribute('role', 'alert');
+  b.innerHTML = html`${icon('pencil')}<span><b>MEGA SLAM!</b> Team power hit for ${m.dmg}!</span>`.__raw;
+  document.body.appendChild(b);
+  setTimeout(() => b.remove(), 3200);
+  sfx.jackpot();
+}
 
 // ----- Treasure Gates -----
 function renderGate(serial) {
@@ -388,22 +419,23 @@ function renderRaceDone(m) {
 
 function renderEnd(m, quiet = false) {
   S.timers.forEach(clearInterval); S.timers = [];
-  const medal = m.rank >= 1 && m.rank <= 3 ? medalImg(m.rank) : pose('cheer');
-  const title = m.rank === 1 ? 'You won!' : m.rank <= 3 ? 'You made the podium!' : 'Great job!';
+  const bs = m.boss;
+  const medal = bs ? pose(bs.won ? 'cheer' : 'oops') : m.rank >= 1 && m.rank <= 3 ? medalImg(m.rank) : pose('cheer');
+  const title = bs ? (bs.won ? `You defeated ${bs.name}!` : `${bs.name} got away!`) : m.rank === 1 ? 'You won!' : m.rank <= 3 ? 'You made the podium!' : 'Great job!';
   setScreen('screen player result ok', html`
     ${header()}
     <main class="center-col">
       <div class="bigemoji pop">${medal}</div>
       <h1>${title}</h1>
-      <p class="lead">You finished <b>#${m.rank}</b> of ${m.of}</p>
+      <p class="lead">${bs ? (bs.won ? 'Your whole class worked together and won!' : `It only had ${bs.pct}% of its health left. You can win next time!`) : html`You finished <b>#${m.rank}</b> of ${m.of}`}</p>
       <div class="stats">
         ${m.mode === 'live'
           ? html`<div><span>Score</span><b>${m.score}</b></div><div><span>Correct</span><b>${m.correct}/${m.total}</b></div>`
-          : html`<div><span>Coins</span><b>${m.score}</b></div><div><span>Right answers</span><b>${m.correct}</b></div>`}
+          : html`<div><span>${bs ? 'Damage' : 'Coins'}</span><b>${m.score}</b></div><div><span>Right answers</span><b>${m.correct}</b></div>`}
       </div>
       <button class="btn btn-sky" data-action="p-home">Back to home</button>
     </main>`);
-  if (m.rank <= 3 && !quiet) { confetti(); sfx.win(); }
+  if (!quiet && (bs ? bs.won : m.rank <= 3)) { confetti(); sfx.win(); }
 }
 
 // ----- Story Time (read along with the big screen) -----

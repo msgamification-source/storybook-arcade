@@ -14,6 +14,7 @@ about students. It can live for free on GitHub Pages.
 | --- | --- |
 | **Live Quiz** | Everyone answers the same question at the same time while the teacher's screen leads. Faster correct answers earn more points, and streaks add bonus points. Leaderboard after each question, podium at the end. |
 | **Race** | Everyone plays at their own speed and races to the finish line. Wrong answers come back around later, so kids get a second try. Coins for correct answers, streak bonuses, and bonuses for the first three to finish. |
+| **Class vs. the Boss** | The whole class teams up against one boss with a shared health bar. Every right answer is a hit, and team power builds up to a **Mega Slam**. Beat the boss before time runs out, and nobody competes against each other. |
 | **Treasure Gates** | Everyone plays at their own speed against the clock. Every right answer opens three hidden gates. Behind them: coins, a jackpot, a double-up, a shield, or a **steal** from a classmate. Most coins when time is up wins. |
 
 Also included: five starter ELA quizzes (grades 3 to 5), a quiz maker, import and export of quizzes,
@@ -35,6 +36,28 @@ QR code joining, kick button, results download (CSV), and rejoin if a student re
 
 **Keep the teacher's tab open.** The teacher's browser is the game server. If it is closed or
 refreshed, the game ends. A warning pops up if you try to leave mid game.
+
+## Class vs. the Boss
+
+A team mode where nobody loses to a classmate. Pick it on the setup screen, then choose a boss, how strong
+it is, and how long the battle lasts.
+
+- **The bosses:** the Page Gobbler, the Typo Troll and the Grammar Gremlin, or "Surprise me." The boss
+  talks in a speech bubble as it gets hurt.
+- **How it works:** the boss's health grows with the class (more students, bigger boss). Each right answer
+  hits it for 10 damage, plus a small streak bonus. Missed questions come back around, as in Race.
+- **Team power:** every hit fills a shared meter. When it is full, the class lands a **Mega Slam** for extra
+  damage, with a big banner on every device.
+- **Strength:** Easy, Medium or Hard. On Hard the boss is bigger and **heals a little every time someone
+  misses**.
+- **Win or lose:** if the class brings the health to zero before time runs out, it is a victory with confetti
+  and a "Final blow" award. If time runs out, the boss "got away" and students see an encouraging message.
+  **Rematch** goes straight back to the setup screen.
+- The Skills report, Story Time and awards all work after a boss battle. Beating the Page Gobbler picks its
+  own story.
+
+To add a boss, put a square PNG in `assets/bosses/` and add it to `js/bosses.js` with its taunts (see
+`tools/make-buddy.py`).
 
 ## Treasure Gates
 
@@ -174,6 +197,7 @@ The picker grows to fit however many buddies you add.
 | Icons | `assets/icons/` | coins, streak flame, finish flag, trophy, shield, bandit mask and more |
 | Medals | `assets/medals/` | the podium and the end screen |
 | Background pattern | `assets/pattern.png` | the faint doodles behind every screen |
+| Bosses | `assets/bosses/` | the pictures for Class vs. the Boss |
 | Arcade scene | `assets/hero.png` | the picture at the top of the home screen (three random buddies stand in it) |
 
 To swap in new art, draw a sheet of separate pictures on a plain white background, then cut it up:
@@ -199,6 +223,7 @@ css/style.css       all styling (Ms. Gamification brand colors, Poppins font)
 js/app.js           home, join, quiz library, game setup
 js/host.js          the teacher's game screens, scoring and Treasure Gates
 js/story.js         the Story Time Finale story maker
+js/bosses.js        the bosses and their strength settings
 js/report.js        the Skills report (counting answers and building the report)
 js/player.js        the student's screens
 js/editor.js        the quiz maker
