@@ -1,7 +1,7 @@
 // The student's side: join a game, answer questions on their own device.
 
 import {
-  html, setScreen, byId, actions, nav, pick, sfx, confetti, shapeIcon, mascot, uid, session, mmss,
+  html, setScreen, byId, actions, nav, pick, sfx, confetti, shapeIcon, mascot, uid, session, mmss, avatarHtml,
   isMuted, setSoundRole,
 } from './util.js';
 import { connectToGame, friendlyError } from './transport.js';
@@ -119,7 +119,7 @@ function onMsg(m) {
 // ---------- Screens ----------
 const header = (extra) => html`
   <header class="pbar">
-    <span class="who"><span class="av">${S.avatar}</span><span class="nm">${S.name}</span></span>
+    <span class="who"><span class="av">${avatarHtml(S.avatar)}</span><span class="nm">${S.name}</span></span>
     ${extra || ''}
     <button class="btn btn-ghost sm" data-action="mute" aria-label="Toggle sound">${isMuted() ? '🔇' : '🔊'}</button>
   </header>`;
@@ -137,7 +137,7 @@ function renderWaiting(text) {
   setScreen('screen player wait', html`
     ${header()}
     <main class="center-col">
-      <div class="avatar-big bob">${S.avatar}</div>
+      <div class="avatar-big bob">${avatarHtml(S.avatar)}</div>
       <h1>${S.name}</h1>
       <p class="lead">${text || "You're in! Look at the big screen."}</p>
       <p class="hint">${S.title}</p>

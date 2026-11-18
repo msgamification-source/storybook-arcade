@@ -78,6 +78,20 @@ Strict school networks sometimes block WebRTC. PeerJS includes free relay server
 (which helps a lot), but if you set your own `config` in the options above, include relay (TURN)
 servers in it too.
 
+## Reading Buddies (the characters)
+
+Kids pick a buddy when they join, and it shows up on the lobby, race track, leaderboard and podium.
+The pictures live in `assets/buddies/`, and the list is in `js/buddies.js`.
+
+To add a new buddy:
+
+1. Make a picture of the character on a plain white background with a closed dark outline.
+2. Run `python3 tools/make-buddy.py my-picture.png owl`. It cuts out the background, sizes the
+   picture and saves `assets/buddies/owl.png`. (It needs `pip install pillow numpy`.)
+3. Add one line to `js/buddies.js`: `{ id: 'owl', name: 'Owl' },`
+
+The picker grows to fit however many buddies you add.
+
 ## Test without students
 
 On the setup screen, tick **Test on this device only**. Open the site in a second tab to play as a
@@ -95,6 +109,9 @@ js/editor.js        the quiz maker
 js/quizzes.js       starter quizzes and quiz checking
 js/transport.js     PeerJS connection (and the same-device test mode)
 js/config.js        name, byline, player limit
+js/buddies.js       the list of character pictures
+assets/buddies/     the character pictures
+tools/              make-buddy.py, turns a picture into a game avatar
 vendor/ fonts/      PeerJS, QR code library and Poppins, bundled so nothing loads from outside
 server/             optional broker
 ```

@@ -3,7 +3,7 @@
 
 import {
   html, raw, setScreen, byId, actions, nav, shuffle, toast, sfx, confetti, shapeIcon, mascot,
-  AVATARS, uid, mmss, downloadFile, csvCell, isMuted, setSoundRole,
+  AVATARS, avatarHtml, uid, mmss, downloadFile, csvCell, isMuted, setSoundRole,
 } from './util.js';
 import { openHost, friendlyError } from './transport.js';
 import { MAX_PLAYERS } from './config.js';
@@ -205,7 +205,7 @@ function updateLobby() {
     const el = document.createElement('div');
     el.className = 'pchip'; el.dataset.pid = p.pid;
     el.innerHTML = html`
-      <span class="av">${p.avatar}</span><span class="nm">${p.name}</span>
+      <span class="av">${avatarHtml(p.avatar)}</span><span class="nm">${p.name}</span>
       <button class="x" data-action="h-kick" data-pid="${p.pid}" aria-label="Remove ${p.name}" title="Remove ${p.name}">&times;</button>`.__raw;
     grid.appendChild(el);
   });
@@ -395,7 +395,7 @@ function renderBoard() {
       <h1>Leaderboard</h1>
       <ol class="board">${top.map((p, i) => html`
         <li class="brow" style="--d:${i * 90}ms">
-          <span class="rank">${i + 1}</span><span class="av">${p.avatar}</span><span class="nm">${p.name}</span>
+          <span class="rank">${i + 1}</span><span class="av">${avatarHtml(p.avatar)}</span><span class="nm">${p.name}</span>
           <span class="barwrap"><i style="width:${Math.max(3, Math.round((p.score / best) * 100))}%"></i></span>
           <b class="sc">${p.score}</b>
           ${p.streak >= 2 ? html`<span class="streak" title="${p.streak} in a row">🔥${p.streak}</span>` : ''}
@@ -517,8 +517,8 @@ function updateLane(p) {
     el = document.createElement('div');
     el.className = 'lane'; el.dataset.pid = p.pid;
     el.innerHTML = html`
-      <span class="lane-name"><span class="av">${p.avatar}</span><span class="nm">${p.name}</span></span>
-      <span class="track"><span class="runner" aria-hidden="true">${p.avatar}</span><span class="flag">🏁</span></span>
+      <span class="lane-name"><span class="av">${avatarHtml(p.avatar)}</span><span class="nm">${p.name}</span></span>
+      <span class="track"><span class="runner" aria-hidden="true">${avatarHtml(p.avatar)}</span><span class="flag">🏁</span></span>
       <span class="lane-score"><b class="coins">0</b><span class="fire"></span></span>`.__raw;
     wrap.appendChild(el);
     wrap.classList.toggle('dense', wrap.children.length > 10);
@@ -550,7 +550,7 @@ function renderPodium(l) {
   const [a, b, c] = l;
   const spot = (p, place) => (p ? html`
     <div class="spot spot-${place}">
-      <div class="spot-av">${p.avatar}</div><div class="spot-nm">${p.name}</div><div class="spot-sc">${p.score}</div>
+      <div class="spot-av">${avatarHtml(p.avatar)}</div><div class="spot-nm">${p.name}</div><div class="spot-sc">${p.score}</div>
       <div class="step"><span>${place}</span></div>
     </div>` : html`<div class="spot spot-${place} empty"></div>`);
   setScreen('screen host v-podium', html`
@@ -566,7 +566,7 @@ function renderPodium(l) {
       <div class="podium">${spot(b, 2)}${spot(a, 1)}${spot(c, 3)}</div>
       ${l.length > 3 ? html`
         <ol class="rest" start="4">${l.slice(3).map((p) => html`
-          <li><span class="av">${p.avatar}</span><span class="nm">${p.name}</span><b>${p.score}</b></li>`)}
+          <li><span class="av">${avatarHtml(p.avatar)}</span><span class="nm">${p.name}</span><b>${p.score}</b></li>`)}
         </ol>` : ''}
     </main>`);
   if (l.length) { confetti(); sfx.win(); }

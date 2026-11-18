@@ -75,8 +75,26 @@ export const session = {
 };
 
 // ---------- Avatars and shapes ----------
-export const AVATARS = ['🐱', '🐶', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐸', '🐵', '🐧',
-  '🐥', '🦄', '🐙', '🦉', '🐢', '🐳', '🦋', '🐝', '🐞', '🦖', '🐷', '🐮'];
+import { BUDDIES } from './buddies.js';
+
+// An avatar is stored as the text "buddy:fox". Older saved emoji avatars still display.
+export const AVATARS = BUDDIES.map((b) => 'buddy:' + b.id);
+const BUDDY_IDS = new Set(BUDDIES.map((b) => b.id));
+export function avatarHtml(a) {
+  const m = /^buddy:([a-z0-9-]+)$/.exec(String(a ?? ''));
+  if (m && BUDDY_IDS.has(m[1])) {
+    return raw(`<img class="buddy" src="assets/buddies/${m[1]}.png" alt="" draggable="false">`);
+  }
+  return raw(`<span class="emoji">${esc(String(a ?? '').slice(0, 8))}</span>`);
+}
+export function avatarName(a) {
+  const id = String(a ?? '').replace(/^buddy:/, '');
+  const b = BUDDIES.find((x) => x.id === id);
+  return b ? b.name : 'Buddy';
+}
+export function preloadBuddies() {
+  BUDDIES.forEach((b) => { const i = new Image(); i.src = `assets/buddies/${b.id}.png`; });
+}
 
 const SHAPE_SVG = [
   // heart

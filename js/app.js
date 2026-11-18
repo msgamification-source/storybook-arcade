@@ -2,7 +2,7 @@
 // host.js (teacher), player.js (students) and editor.js (quiz maker).
 
 import {
-  html, setScreen, app, actions, nav, byId, toast, mascot, AVATARS, pick, store, session, toggleMute, sfx,
+  html, setScreen, app, actions, nav, byId, toast, mascot, AVATARS, avatarHtml, avatarName, preloadBuddies, pick, store, session, toggleMute, sfx,
 } from './util.js';
 import { APP_NAME, BYLINE } from './config.js';
 import { allQuizzes, findQuiz, copyOf, blankQuiz, deleteMine, normalizeQuiz, upsertMine, loadMine } from './quizzes.js';
@@ -18,7 +18,8 @@ function renderHome(opts = {}) {
   const params = new URLSearchParams(location.search);
   const pin = opts.pin || params.get('pin') || '';
   const name = opts.name ?? profile.name ?? '';
-  chosenAvatar = opts.avatar || profile.avatar || pick(AVATARS);
+  const remembered = opts.avatar || profile.avatar;
+  chosenAvatar = AVATARS.includes(remembered) ? remembered : pick(AVATARS);
   setScreen('screen v-home', html`
     <main class="home">
       <div class="brand">
@@ -34,7 +35,7 @@ function renderHome(opts = {}) {
           <input id="name-in" maxlength="14" placeholder="Star Reader" value="${name}" autocapitalize="words"></label>
         <div class="field"><span id="av-label">Pick your buddy</span>
           <div class="avatars" role="radiogroup" aria-labelledby="av-label">
-            ${AVATARS.map((a) => html`<button type="button" class="avbtn ${a === chosenAvatar ? 'on' : ''}" role="radio" aria-checked="${a === chosenAvatar}" data-action="pick-av" data-av="${a}">${a}</button>`)}
+            ${AVATARS.map((a) => html`<button type="button" class="avbtn ${a === chosenAvatar ? 'on' : ''}" role="radio" aria-checked="${a === chosenAvatar}" data-action="pick-av" data-av="${a}" aria-label="${avatarName(a)}">${avatarHtml(a)}</button>`)}
           </div></div>
         <p class="error" id="join-err" role="alert">${opts.error || ''}</p>
         <button class="btn btn-pink btn-lg" type="submit">Let's play!</button>
@@ -199,6 +200,7 @@ actions.mute = (_d, el) => { el.textContent = toggleMute() ? '🔇' : '🔊'; };
 
 // ---------- Start ----------
 function start() {
+  preloadBuddies();
   const wantsPin = new URLSearchParams(location.search).get('pin');
   const saved = session.get('quizparty.player');
   if (saved && wantsPin && saved.pin !== wantsPin) { leaveGame(); }
