@@ -634,3 +634,16 @@ textarea { resize: vertical; }
 .v-podium .awards li { font-size: clamp(.8rem, 2vh, 1rem); padding: .2rem .8rem; }
 .v-podium .awards .ico { width: 1.3rem; height: 1.3rem; }
 .v-podium .rest { margin: .6rem auto 0; overflow-y: auto; min-height: 0; flex: 0 1 auto; padding: 0 .3rem .4rem; }
+
+/* ---------- Connection check ---------- */
+.linkbtn { background: none; border: 0; padding: 0; font: inherit; font-weight: 700; color: var(--ink); text-decoration: underline; text-decoration-thickness: 2px; cursor: pointer; }
+.linkbtn.small { font-size: .8rem; font-weight: 600; }
+.trouble { margin: -.2rem 0 .8rem; font-size: .9rem; }
+.checkpage { width: 100%; max-width: 40rem; margin: 0 auto; }
+.checks { list-style: none; margin: 1rem 0; display: grid; gap: .9rem; }
+.checks li { display: flex; gap: .8rem; align-items: flex-start; }
+.checks .ck-i { font-size: 1.5rem; line-height: 1.2; flex: none; width: 2rem; text-align: center; }
+.checks small { display: block; color: var(--soft); font-weight: 500; }
+.verdict { margin: 0 0 1rem; padding: .9rem 1.1rem; border: var(--line); border-radius: var(--radius); box-shadow: var(--pop); }
+.verdict p { margin: .3rem 0 0; }
+.verdict.good { background: var(--mint); } .verdict.warn { background: var(--sun); } .verdict.bad { background: var(--pink); }

@@ -210,6 +210,26 @@ Names go in reading order (left to right, then top to bottom). Use `--same-scale
 for a set of poses of one character. To rebuild the background pattern from the icons, run
 `python3 tools/make-pattern.py`. All the tools need `pip install pillow numpy`.
 
+## If a student can not join
+
+The game says what went wrong:
+
+- **"We could not find that game."** The PIN is wrong, or the teacher's game room is closed. Check the PIN
+  on the big screen.
+- **"We found the game, but your device could not connect to it."** The student's device and the teacher's
+  computer can not reach each other. This usually happens when a student is on **cell data** (or a different
+  network) while the teacher's computer is on **school Wi-Fi**. Have the student join from the same Wi-Fi.
+- **"We could not reach the connection service."** The free service that introduces devices to each other
+  is blocked or down. Try another network, or try again in a few minutes.
+
+Every one of these offers a **connection check** (also at the bottom of the home screen). It tests the
+connection service, a direct path, and the backup relay on that device, and explains the result in plain
+words. Run it on a student's device and on the classroom computer to see where the problem is.
+
+**Most reliable setup:** the teacher's computer and the students' devices all on the same school Wi-Fi.
+If your school blocks live connections, the next step is running your own relay (see `server/` and the
+notes above) or switching to a different connection service.
+
 ## Test without students
 
 On the setup screen, tick **Test on this device only**. Open the site in a second tab to play as a
@@ -229,6 +249,7 @@ js/player.js        the student's screens
 js/editor.js        the quiz maker
 js/quizzes.js       starter quizzes and quiz checking
 js/transport.js     PeerJS connection (and the same-device test mode)
+js/check.js         the connection check
 js/config.js        name, byline, player limit, custom sound files
 js/buddies.js       the list of character pictures
 assets/buddies/     the character pictures

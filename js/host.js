@@ -5,7 +5,7 @@ import {
   html, raw, setScreen, byId, actions, nav, shuffle, toast, sfx, confetti, shapeIcon, mascot,
   AVATARS, avatarHtml, avatarName, icon, pose, medalImg, uid, mmss, downloadFile, csvCell, isMuted, setSoundRole, countUp,
 } from './util.js';
-import { openHost, friendlyError } from './transport.js';
+import { openHost, friendlyError, errorKind } from './transport.js';
 import { buildStory, storyHtml, plainText, speak, canSpeak, stopSpeaking } from './story.js';
 import { newStats, recordAnswer, recordNone, buildReport, reportCsv, BAND_LABEL, CHECK_IN_BELOW, CHECK_IN_MIN_ANSWERS } from './report.js';
 import { registerTemp } from './quizzes.js';
@@ -105,7 +105,10 @@ export async function hostGame({ quiz, mode, local, minutes, opts }) {
         <h1>Hmm, that did not work</h1>
         <p>${friendlyError(e)}</p>
         <p class="hint">Tip: the "Test on this device" option works without the internet.</p>
-        <button class="btn btn-sky" data-action="to-library">Back</button>
+        <div class="row" style="justify-content:center">
+          <button class="btn btn-sky" data-action="to-library">Back</button>
+          ${errorKind(e) !== 'notfound' ? html`<button class="btn" data-action="to-check">Run a connection check</button>` : ''}
+        </div>
       </div>`);
   }
   const o = { ...DEFAULT_OPTS, ...(opts || {}) };

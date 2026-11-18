@@ -8,6 +8,7 @@ import { APP_NAME, BYLINE } from './config.js';
 import { allQuizzes, findQuiz, copyOf, blankQuiz, deleteMine, normalizeQuiz, upsertMine, loadMine } from './quizzes.js';
 import { openEditor } from './editor.js';
 import { BOSSES } from './bosses.js';
+import { runCheck, hasWebRTC } from './check.js';
 import { hostGame, DEFAULT_OPTS } from './host.js';
 import { joinGame, resumeSession, leaveGame } from './player.js';
 
@@ -55,10 +56,12 @@ function renderHome(opts = {}) {
             ${AVATARS.map((a) => html`<button type="button" class="avbtn ${a === chosenAvatar ? 'on' : ''}" role="radio" aria-checked="${a === chosenAvatar}" data-action="pick-av" data-av="${a}" aria-label="${avatarName(a)}">${avatarHtml(a)}</button>`)}
           </div></div>
         <p class="error" id="join-err" role="alert">${opts.error || ''}</p>
+        ${opts.check ? html`<p class="trouble"><button type="button" class="linkbtn" data-action="to-check">Run a connection check</button> to find out what is wrong.</p>` : ''}
         <button class="btn btn-pink btn-lg" type="submit">Let's play!</button>
       </form>
       <button class="btn btn-sky" data-action="to-library">Teachers: host a game</button>
-      <footer class="foot">Made with love for reading fun by <a href="https://msgamification.com" target="_blank" rel="noopener">Ms. Gamification</a></footer>
+      <footer class="foot">Made with love for reading fun by <a href="https://msgamification.com" target="_blank" rel="noopener">Ms. Gamification</a>
+        <br><button type="button" class="linkbtn small" data-action="to-check">Trouble connecting? Run a connection check</button></footer>
     </main>`);
   // Only auto-focus on computers. On phones and tablets it would pop the keyboard over the page.
   if (window.matchMedia && matchMedia('(pointer: fine)').matches) (pin ? byId('name-in') : byId('pin-in')).focus({ preventScroll: true });
@@ -251,6 +254,57 @@ function readHostOptions(f) {
 }
 
 actions['lib-play'] = ({ id }) => { const qz = findQuiz(id); if (qz) renderSetup(qz); };
+
+// ---------- Connection check ----------
+const CHECK_STEPS = [
+  ['broker', 'Reach the connection service', 'The free service that introduces devices to each other.'],
+  ['direct', 'Find a direct path between devices', 'Works when devices are on the same Wi-Fi.'],
+  ['relay', 'Find the backup relay', 'Needed when devices are on different networks, like cell data and school Wi-Fi.'],
+];
+const STATE_ICON = { wait: '⏳', run: '🔎', ok: '✅', bad: '❌' };
+let checking = false;
+
+function renderCheck() {
+  setScreen('screen v-check', html`
+    <header class="topbar"><button class="btn btn-ghost" data-action="to-home">&larr; Back</button><div></div></header>
+    <main class="checkpage">
+      <h1>Connection check</h1>
+      <p class="lead">Live games need a few things to work. This tests them on <b>this device</b>. Run it on a student's phone and on the classroom computer.</p>
+      <ol class="checks card">
+        ${CHECK_STEPS.map(([id, title, why]) => html`
+          <li id="ck-${id}"><span class="ck-i">${STATE_ICON.wait}</span><span><b>${title}</b><small>${why}</small></span></li>`)}
+      </ol>
+      <div id="ck-result" hidden></div>
+      <div class="row"><button class="btn btn-pink" id="ck-run" data-action="run-check">Start the check</button></div>
+      <p class="hint">Nothing is saved or sent anywhere except the test itself. It takes about 20 seconds.</p>
+    </main>`);
+  if (!hasWebRTC()) {
+    const r = byId('ck-result');
+    r.hidden = false;
+    r.className = 'verdict bad';
+    r.innerHTML = html`<b>This browser can not run live games.</b><p>Try a newer version of Chrome, Safari or Edge.</p>`.__raw;
+  }
+}
+nav.check = renderCheck;
+
+actions['run-check'] = async () => {
+  if (checking) return;
+  checking = true;
+  const btn = byId('ck-run');
+  btn.disabled = true; btn.textContent = 'Checking...';
+  byId('ck-result').hidden = true;
+  CHECK_STEPS.forEach(([id]) => { byId('ck-' + id).querySelector('.ck-i').textContent = STATE_ICON.wait; });
+  const res = await runCheck((id, state) => { const el = byId('ck-' + id); if (el) el.querySelector('.ck-i').textContent = STATE_ICON[state]; });
+  checking = false;
+  const r = byId('ck-result');
+  if (!r) return;
+  r.hidden = false;
+  r.className = 'verdict ' + res.verdict.level;
+  r.innerHTML = html`<b>${res.verdict.title}</b><p>${res.verdict.text}</p>
+    <p class="hint">Results: service ${res.broker ? 'ok' : 'blocked'}, direct path ${res.direct ? 'ok' : 'blocked'}, relay ${res.relay ? 'ok' : 'blocked'}.</p>`.__raw;
+  btn.disabled = false; btn.textContent = 'Run it again';
+};
+actions['to-check'] = () => renderCheck();
 
 // ---------- Event wiring ----------
 app.addEventListener('click', (e) => {

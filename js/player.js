@@ -5,7 +5,7 @@ import {
   pose, icon, medalImg, countUp,
   isMuted, setSoundRole,
 } from './util.js';
-import { connectToGame, friendlyError } from './transport.js';
+import { connectToGame, friendlyError, errorKind } from './transport.js';
 import { storyHtml, speak, canSpeak, stopSpeaking } from './story.js';
 import { bossById } from './bosses.js';
 
@@ -25,7 +25,7 @@ export async function joinGame({ pin, name, avatar, pid, quiet = false }) {
     transport = await connectToGame(pin);
   } catch (e) {
     session.del(KEY);
-    return nav.home({ pin, name, avatar, error: quiet ? '' : friendlyError(e) });
+    return nav.home({ pin, name, avatar, error: quiet ? '' : friendlyError(e), check: errorKind(e) !== 'notfound' && !quiet });
   }
   attach(transport, { pin, name, avatar, pid: pid || uid() });
 }
