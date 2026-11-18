@@ -7,6 +7,8 @@ import {
 } from './util.js';
 import { openHost, friendlyError } from './transport.js';
 import { buildStory, storyHtml, plainText, speak, canSpeak, stopSpeaking } from './story.js';
+import { newStats, recordAnswer, recordNone, buildReport, reportCsv, BAND_LABEL, CHECK_IN_BELOW, CHECK_IN_MIN_ANSWERS } from './report.js';
+import { registerTemp } from './quizzes.js';
 import { MAX_PLAYERS } from './config.js';
 
 let G = null; // the current game, or null
@@ -49,7 +51,7 @@ function randomName(avatar) {
 
 // A copy of the quiz for this game, with the order mixed up if the teacher asked for that.
 function prepareQuiz(quiz, o) {
-  let qs = quiz.questions.map((q) => ({ ...q, options: [...q.options] }));
+  let qs = quiz.questions.map((q, i) => ({ ...q, _i: i, options: [...q.options] }));
   if (o.shuffleA) {
     qs = qs.map((q) => {
       const idx = shuffle(q.options.map((_, i) => i));
@@ -110,7 +112,7 @@ export async function hostGame({ quiz, mode, local, minutes, opts }) {
     players: new Map(), conns: new Map(), phase: 'lobby',
     qi: -1, answers: new Map(), qStart: 0, limit: 20, counts: [], ticker: 0, allTimer: 0,
     finishCount: 0, raceEnd: 0, feed: [], feedId: 0, gatesTimer: 0, bigSteal: null,
-    story: null, storyPage: 0, storyOn: false,
+    story: null, storyPage: 0, storyOn: false, stats: newStats(), report: null,
   };
   transport.onMessage = onMessage;
   transport.onClose = onClose;
@@ -178,7 +180,7 @@ function onJoin(conn, m) {
     p = {
       pid: uid(), name: random ? randomName(avatar) : typed, avatar,
       conn, connected: true, score: 0, streak: 0, correct: 0, last: null, rank: 0, prevRank: 0, delta: 0, race: null,
-      bestStreak: 0, steals: 0, stoleCoins: 0, double: false, shield: false,
+      bestStreak: 0, steals: 0, stoleCoins: 0, double: false, shield: false, attempts: 0, right: 0,
     };
     G.players.set(p.pid, p);
   }
@@ -363,7 +365,11 @@ function endQuestion() {
   const counts = q.options.map(() => 0);
   list().forEach((p) => {
     const a = G.answers.get(p.pid);
-    if (a) counts[a.c]++;
+    if (a) {
+      counts[a.c]++;
+      recordAnswer(G.stats, q, q.options[a.c], a.c === q.correct);
+      p.attempts++; if (a.c === q.correct) p.right++;
+    } else if (p.connected) recordNone(G.stats, q);
     if (a && a.c === q.correct) {
       p.streak++; p.correct++; p.bestStreak = Math.max(p.bestStreak, p.streak);
       const base = Math.round(1000 * (1 - (a.t / q.time) / 2));
@@ -485,7 +491,7 @@ function renderReveal() {
     <header class="qbar">
       <div class="chip">Question ${G.qi + 1} of ${nQ()}</div>
       <div class="answered"><b>${G.answers.size}</b> of ${connected().length} answered</div>
-      <div class="row">${autoButton()}<button class="btn btn-pink" data-action="h-next">${last ? 'See results' : 'Next'} &rarr;</button></div>
+      <div class="row">${autoButton()}<button class="btn btn-ghost" data-action="h-end">End game</button><button class="btn btn-pink" data-action="h-next">${last ? 'See results' : 'Next'} &rarr;</button></div>
     </header>
     <main class="qmain"><div class="timer ghost" aria-hidden="true"></div><h1 class="qtext">${q.text}</h1></main>
     ${optsHtml(q, G.counts)}`);
@@ -500,7 +506,7 @@ function renderBoard() {
   setScreen('screen host v-board', html`
     <header class="topbar">
       <div class="chip">After question ${G.qi + 1} of ${nQ()}</div>
-      <div class="row">${autoButton()}<button class="btn btn-pink" data-action="h-next">Next question &rarr;</button></div>
+      <div class="row">${autoButton()}<button class="btn btn-ghost" data-action="h-end">End game</button><button class="btn btn-pink" data-action="h-next">Next question &rarr;</button></div>
     </header>
     <main class="board-main">
       <h1>${icon('trophy')} Leaderboard</h1>
@@ -575,6 +581,8 @@ function onRaceAnswer(p, m) {
   cur.answered = true;
   const q = G.quiz.questions[cur.qi];
   const ok = cur.order[m.c] === q.correct;
+  recordAnswer(G.stats, q, q.options[cur.order[m.c]], ok);
+  p.attempts++; if (ok) p.right++;
   let gain = 0; let bonus = 0;
   if (ok) {
     r.queue.shift(); r.correct++; p.correct++; p.streak++; p.bestStreak = Math.max(p.bestStreak, p.streak);
@@ -779,7 +787,7 @@ function updateGates() {
     let el = have.get(p.pid);
     if (!el) {
       el = document.createElement('div');
-      el.className = 'grow'; el.dataset.pid = p.pid;
+      el.className = 'coinrow'; el.dataset.pid = p.pid;
       el.innerHTML = html`<span class="rank"></span><span class="av">${avatarHtml(p.avatar)}</span><span class="nm">${p.name}</span>
         <span class="badges"></span><b class="coins">${icon('coin')}<span class="cn">0</span></b>`.__raw;
       board.appendChild(el);
@@ -841,6 +849,7 @@ function renderPodium(l, quiet = false) {
       <div class="chip">${G.quiz.emoji} ${G.quiz.title}</div>
       <div class="row">
         ${l.length ? html`<button class="btn btn-pink" data-action="h-story">${icon('book')} Story time!</button>` : ''}
+        ${G.stats.q.size ? html`<button class="btn btn-mint" data-action="h-report">${icon('trophy')} Skills report</button>` : ''}
         <button class="btn btn-sky" data-action="h-csv">Download results</button>
         <button class="btn" data-action="h-exit">Finish</button>
       </div>
@@ -933,12 +942,96 @@ document.addEventListener('keydown', (e) => {
   actions['h-story-go']({ d: e.key === 'ArrowRight' ? 1 : -1 });
 });
 
+// ---------- Skills report ----------
+const safeName = () => G.quiz.title.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'quiz';
+
+function currentReport() {
+  return buildReport(G.stats, list().map((p) => ({ name: p.name, attempts: p.attempts, right: p.right })));
+}
+
+actions['h-report'] = () => { if (G && G.phase === 'end') renderReport(); };
+actions['h-report-back'] = () => { if (G) renderPodium(ranked(), true); };
+actions['h-print'] = () => window.print();
+actions['h-report-csv'] = () => {
+  if (!G || !G.report) return;
+  downloadFile(`${safeName()}-skills-report.csv`, reportCsv(G.report), 'text/csv');
+};
+// Turn the questions the class missed into a brand new quiz and open its setup screen.
+actions['h-review'] = () => {
+  if (!G || !G.report) return;
+  const qs = G.report.review.slice(0, 12)
+    .map((rq) => G.quiz.questions.find((q) => q.text === rq.text)).filter(Boolean)
+    .map(({ _i, ...q }) => q);
+  if (!qs.length) return;
+  const quiz = { id: 'review-' + uid(), title: `${G.quiz.title}: Review`, emoji: G.quiz.emoji, grade: G.quiz.grade || '',
+    desc: 'The questions your class missed.', questions: qs };
+  registerTemp(quiz);
+  stopHosting();
+  nav.setup(quiz);
+};
+
+function renderReport() {
+  const r = currentReport();
+  G.report = r;
+  const students = list().filter((p) => p.attempts > 0).length;
+  const date = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  setScreen('screen host v-report', html`
+    <header class="topbar no-print">
+      <button class="btn btn-ghost" data-action="h-report-back">&larr; Back to podium</button>
+      <div class="chip">${icon('trophy')} Skills report</div>
+      <div class="row">
+        ${r.review.length ? html`<button class="btn btn-pink" data-action="h-review">Play the missed questions</button>` : ''}
+        <button class="btn btn-sky" data-action="h-print">Print</button>
+        <button class="btn" data-action="h-report-csv">Download CSV</button>
+      </div>
+    </header>
+    <main class="report">
+      <h1>${icon('trophy')} Skills report</h1>
+      <p class="report-meta">${G.quiz.title}, ${date}. ${students} ${students === 1 ? 'student' : 'students'} gave ${r.attempts} answers.
+        <b>${r.overall}% right overall.</b></p>
+
+      <section class="card rsec">
+        <h2>Skills, weakest first</h2>
+        ${r.skills.length ? html`<ul class="sklist">${r.skills.map((s) => html`
+          <li class="skrow">
+            <span class="skname">${s.skill}</span>
+            <span class="skbar" aria-hidden="true"><i class="b-${s.band}" style="width:${Math.max(3, s.pct)}%"></i></span>
+            <b class="skpct">${s.pct}%</b>
+            <span class="tag tag-${s.band}">${BAND_LABEL[s.band]}</span>
+            <small>${s.right} of ${s.attempts} right</small>
+          </li>`)}</ul>`
+          : html`<p class="hint">These questions do not have skills yet. In the quiz maker, add a skill to each question (like "Main idea" or "Similes") and this list will group your class's results by skill.</p>`}
+      </section>
+
+      <section class="card rsec">
+        <h2>Questions to review</h2>
+        ${r.review.length ? html`<div class="qrevs">${r.review.slice(0, 8).map((q) => html`
+          <article class="qrev">
+            <div class="qrev-head"><b class="qpct tag-${q.band}">${q.pct}%</b><p>${q.text}</p></div>
+            <p>Right answer: <b>${q.correctText}</b></p>
+            ${q.topWrong ? html`<p>Most picked wrong answer: <b>${q.topWrong.text}</b> (${q.topWrong.n} ${q.topWrong.n === 1 ? 'answer' : 'answers'})</p>` : ''}
+            ${q.none ? html`<p class="hint">${q.none} did not answer in time.</p>` : ''}
+            ${q.skill ? html`<span class="skchip">${q.skill}</span>` : ''}
+          </article>`)}</div>`
+          : html`<div class="allgood">${pose('cheer')}<p>${r.attempts ? 'Everyone did great! No question needs a second look.' : 'No answers were recorded in this game.'}</p></div>`}
+      </section>
+
+      ${r.checkIn.length ? html`
+      <section class="card rsec">
+        <h2>Students to check in with</h2>
+        <ul class="chips">${r.checkIn.map((c) => html`<li>${c.name} <small>${c.pct}% of ${c.attempts}</small></li>`)}</ul>
+        <p class="hint">Under ${CHECK_IN_BELOW}% right after ${CHECK_IN_MIN_ANSWERS} or more answers. ${G.opts.names === 'random' ? 'Random names are on, so these are not real student names.' : ''}</p>
+      </section>` : ''}
+
+      <p class="hint no-print">This report is not saved anywhere. Print it or download the CSV before you close this page.</p>
+    </main>`);
+}
+
 actions['h-csv'] = () => {
   if (!G) return;
   const rows = [['Rank', 'Name', 'Score', 'Questions correct', 'Total questions']];
   ranked().forEach((p) => rows.push([p.rank, p.name, p.score, p.correct, nQ()]));
-  const safe = G.quiz.title.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'quiz';
-  downloadFile(`${safe}-results.csv`, rows.map((r) => r.map(csvCell).join(',')).join('\n'), 'text/csv');
+  downloadFile(`${safeName()}-results.csv`, rows.map((r) => r.map(csvCell).join(',')).join('\n'), 'text/csv');
 };
 
 actions['h-exit'] = () => {

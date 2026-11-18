@@ -126,6 +126,7 @@ function renderLibrary() {
     </main>`);
 }
 nav.library = renderLibrary;
+nav.setup = (quiz) => renderSetup(quiz);
 
 actions['to-home'] = () => renderHome();
 actions['to-library'] = () => renderLibrary();

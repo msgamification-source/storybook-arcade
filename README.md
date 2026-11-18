@@ -56,6 +56,25 @@ ahead of you, a "steal" turns into a coin pile. The teacher can switch stealing 
 prizes are decided on the teacher's computer, so students can not peek or cheat. The big screen shows a
 live coin board and a "What just happened" feed.
 
+## Skills report
+
+After any game, tap **Skills report** on the podium to see what to reteach:
+
+- **Skills, weakest first.** Every question can have a skill (like "Similes" or "Main idea"). The report
+  groups the class's answers by skill and marks each one **Reteach** (under 60%), **Almost there**
+  (60 to 79%) or **Strong** (80% and up).
+- **Questions to review.** Every question under 80%, with the right answer and the **most picked wrong
+  answer**, which often shows the exact mix-up.
+- **Students to check in with.** Anyone under 50% right after 3 or more answers. (With random names turned
+  on, these are not real student names.)
+- **Print** a clean one-page copy, or **Download CSV** for a spreadsheet.
+- **Play the missed questions** turns everything under 80% into a new "Review" quiz and opens its setup
+  screen, so you can reteach with another round right away.
+
+It works in all three game modes. The starter quizzes already have skills. For your own quizzes, fill in the
+**Skill** box on each question in the quiz maker. The report is built on the teacher's computer, is not saved
+anywhere, and nothing about it is sent to any server, so print it or download the CSV before closing the page.
+
 ## Story Time Finale
 
 After the podium, tap **Story time!**. The game writes a short, silly story starring the class: the
@@ -102,12 +121,13 @@ A quiz file looks like this:
   "title": "My Quiz",
   "emoji": "⭐",
   "questions": [
-    { "text": "Which word is a noun?", "options": ["run", "puppy", "quickly"], "correct": 1, "time": 20 }
+    { "text": "Which word is a noun?", "options": ["run", "puppy", "quickly"], "correct": 1, "time": 20, "skill": "Nouns" }
   ]
 }
 ```
 
-`correct` counts from 0 (the first answer is 0). `time` is seconds, from 5 to 120.
+`correct` counts from 0 (the first answer is 0). `time` is seconds, from 5 to 120. `skill` is optional and
+is what the Skills report groups by.
 
 ## How the live connection works (and one thing to know)
 
@@ -179,6 +199,7 @@ css/style.css       all styling (Ms. Gamification brand colors, Poppins font)
 js/app.js           home, join, quiz library, game setup
 js/host.js          the teacher's game screens, scoring and Treasure Gates
 js/story.js         the Story Time Finale story maker
+js/report.js        the Skills report (counting answers and building the report)
 js/player.js        the student's screens
 js/editor.js        the quiz maker
 js/quizzes.js       starter quizzes and quiz checking

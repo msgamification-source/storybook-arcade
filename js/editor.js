@@ -1,7 +1,7 @@
 // The quiz maker: write your own questions, save them on this device, share them as a file.
 
 import { html, setScreen, actions, byId, toast, shapeIcon, downloadFile, nav, app } from './util.js';
-import { normalizeQuiz, upsertMine } from './quizzes.js';
+import { normalizeQuiz, upsertMine, allSkills } from './quizzes.js';
 
 let E = null; // { quiz, dirty }
 const TIMES = [10, 15, 20, 30, 45, 60, 90, 120];
@@ -35,9 +35,14 @@ function qcard(qq, i, n) {
         <input type="text" class="o-text" maxlength="120" value="${qq.options[k] || ''}" placeholder="Answer ${'ABCD'[k]}" aria-label="Answer ${'ABCD'[k]}">
       </label>`)}
     </div>
-    <label class="field inline"><span>Time to answer</span>
-      <select class="q-time">${times.map((t) => html`<option value="${t}" ${t === qq.time ? 'selected' : ''}>${t} seconds</option>`)}</select>
-    </label>
+    <div class="row2 qmeta">
+      <label class="field inline"><span>Time to answer</span>
+        <select class="q-time">${times.map((t) => html`<option value="${t}" ${t === qq.time ? 'selected' : ''}>${t} seconds</option>`)}</select>
+      </label>
+      <label class="field inline grow"><span>Skill (optional)</span>
+        <input type="text" class="q-skill" maxlength="40" list="skill-list" value="${qq.skill || ''}" placeholder="Example: Main idea" aria-label="Skill for question ${i + 1}">
+      </label>
+    </div>
   </section>`;
 }
 
@@ -62,6 +67,8 @@ function render(focusIndex) {
             <input id="e-desc" maxlength="140" value="${q.desc}" placeholder="What is this quiz about?"></label>
         </div>
       </div>
+      <datalist id="skill-list">${allSkills().map((s) => html`<option value="${s}">`)}</datalist>
+      <p class="hint">Tip: give each question a skill, like "Main idea" or "Similes". After a game, the Skills report shows which skills your class needs help with.</p>
       ${q.questions.map((qq, i) => qcard(qq, i, q.questions.length))}
       <button class="btn btn-mint btn-lg" data-action="e-add">+ Add a question</button>
       <p class="error" id="e-err" role="alert"></p>
@@ -84,6 +91,7 @@ function readForm() {
       options: [...card.querySelectorAll('.o-text')].map((i) => i.value),
       correct: checked ? Number(checked.value) : 0,
       time: Number(card.querySelector('.q-time').value),
+      skill: card.querySelector('.q-skill').value,
     };
   });
 }
@@ -99,7 +107,7 @@ function showError(r) {
 
 actions['e-add'] = () => {
   readForm();
-  E.quiz.questions.push({ text: '', options: ['', '', '', ''], correct: 0, time: 20 });
+  E.quiz.questions.push({ text: '', options: ['', '', '', ''], correct: 0, time: 20, skill: '' });
   E.dirty = true;
   render(E.quiz.questions.length - 1);
 };

@@ -87,6 +87,15 @@ export const BUILTIN = [
   },
 ];
 
+// The skill each starter question practices. The Skills report groups by these.
+const SKILLS = {
+  'builtin-pos': ['Nouns', 'Verbs', 'Adjectives', 'Adverbs', 'Nouns', 'Pronouns', 'Verbs', 'Adjectives', 'Adverbs', 'Nouns'],
+  'builtin-figurative': ['Simile', 'Metaphor', 'Idioms', 'Hyperbole', 'Personification', 'Alliteration', 'Onomatopoeia', 'Idioms', 'Simile', 'Personification'],
+  'builtin-grammar': ['End punctuation', 'Capital letters', 'Apostrophes', 'Apostrophes', 'Commas', 'Quotation marks', 'Homophones', 'Complete sentences', 'Homophones', 'Subject-verb agreement'],
+  'builtin-vocab': ['Prefixes', 'Prefixes', 'Suffixes', 'Suffixes', 'Prefixes', 'Synonyms and antonyms', 'Synonyms and antonyms', 'Context clues', 'Context clues', 'Multiple-meaning words'],
+};
+BUILTIN.forEach((b) => (SKILLS[b.id] || []).forEach((skill, i) => { if (b.questions[i]) b.questions[i].skill = skill; }));
+
 // ---------- Teacher-made quizzes ----------
 const KEY = 'quizparty.myquizzes.v1';
 
@@ -119,7 +128,7 @@ export function normalizeQuiz(o) {
     if (options.length < 2) return { error: `Question ${n + 1} needs at least two answers.`, at: n };
     if (correct < 0) return { error: `Question ${n + 1}: pick which answer is correct (and make sure it is filled in).`, at: n };
     const time = Math.min(120, Math.max(5, Math.round(Number(r.time)) || 20));
-    questions.push({ text, options, correct, time });
+    questions.push({ text, options, correct, time, skill: cleanStr(r.skill, 40) });
   }
   return {
     quiz: {
@@ -143,7 +152,14 @@ export function loadMine() {
 export function saveMine(list) { store.set(KEY, list); }
 
 export function allQuizzes() { return [...BUILTIN, ...loadMine()]; }
-export function findQuiz(id) { return allQuizzes().find((x) => x.id === id) || null; }
+// Quizzes made on the fly (like "Review: missed questions") live only until the page closes.
+const temporary = new Map();
+export function registerTemp(quiz) { temporary.set(quiz.id, quiz); }
+export function findQuiz(id) { return temporary.get(id) || allQuizzes().find((x) => x.id === id) || null; }
+// Every skill name used in any quiz, to suggest in the quiz maker.
+export function allSkills() {
+  return [...new Set(allQuizzes().flatMap((q) => q.questions.map((x) => x.skill)).filter(Boolean))].sort();
+}
 
 export function upsertMine(quiz) {
   const list = loadMine();
@@ -163,6 +179,6 @@ export function copyOf(quiz) {
 export function blankQuiz() {
   return {
     id: 'mine-' + uid(), title: '', emoji: '⭐', grade: '', desc: '',
-    questions: [{ text: '', options: ['', '', '', ''], correct: 0, time: 20 }],
+    questions: [{ text: '', options: ['', '', '', ''], correct: 0, time: 20, skill: '' }],
   };
 }
