@@ -13,6 +13,21 @@ import { joinGame, resumeSession, leaveGame } from './player.js';
 // ---------- Home and join ----------
 let chosenAvatar = '';
 
+// The Storybook Arcade scene, with three random buddies standing in it.
+function heroScene() {
+  const spots = [
+    { x: 8, b: 17, w: 23 },    // beside the arcade cabinet
+    { x: 45, b: 4, w: 19 },    // on the rug
+    { x: 90, b: 17, w: 23 },   // beside the bookshelf
+  ];
+  const picks = [...AVATARS].sort(() => Math.random() - 0.5).slice(0, spots.length);
+  return html`
+    <div class="hero" aria-hidden="true">
+      <img class="hero-scene" src="assets/hero.png" alt="" draggable="false">
+      ${spots.map((s, i) => html`<span class="hb" style="--x:${s.x}%;--b:${s.b}%;--w:${s.w}%;--d:${i * 0.4}s">${avatarHtml(picks[i])}</span>`)}
+    </div>`;
+}
+
 function renderHome(opts = {}) {
   const profile = store.get('quizparty.profile', {}) || {};
   const params = new URLSearchParams(location.search);
@@ -23,7 +38,7 @@ function renderHome(opts = {}) {
   setScreen('screen v-home', html`
     <main class="home">
       <div class="brand">
-        ${mascot('bob')}
+        ${heroScene()}
         <h1 class="logo">${APP_NAME}</h1>
         <p class="byline">${BYLINE}</p>
       </div>

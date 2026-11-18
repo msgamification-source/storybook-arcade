@@ -122,6 +122,7 @@ The picker grows to fit however many buddies you add.
 | Icons | `assets/icons/` | coins, streak flame, finish flag, trophy and more |
 | Medals | `assets/medals/` | the podium and the end screen |
 | Background pattern | `assets/pattern.png` | the faint doodles behind every screen |
+| Arcade scene | `assets/hero.png` | the picture at the top of the home screen (three random buddies stand in it) |
 
 To swap in new art, draw a sheet of separate pictures on a plain white background, then cut it up:
 
