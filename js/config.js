@@ -36,4 +36,8 @@ export const SOUND_FILES = {
 // Realtime Database here, for example: 'https://storybook-arcade-12345-default-rtdb.firebaseio.com'
 // With it set, games connect through ordinary web traffic that school networks almost always allow.
 // Leave it empty to use the direct (PeerJS) connection only. Setup steps are in the README.
-export const RELAY_URL = (typeof window !== 'undefined' && window.STORYBOOK_ARCADE_RELAY_URL) || '';
+const MY_DATABASE = 'https://storybook-arcade-default-rtdb.firebaseio.com';
+// (Tests and advanced setups can override this before the app loads with window.STORYBOOK_ARCADE_RELAY_URL.
+// An empty string turns the reliable connection off.)
+export const RELAY_URL = (typeof window !== 'undefined' && typeof window.STORYBOOK_ARCADE_RELAY_URL === 'string')
+  ? window.STORYBOOK_ARCADE_RELAY_URL : MY_DATABASE;
