@@ -100,6 +100,7 @@ function quizCard(qz) {
       <div class="row">
         <button class="btn btn-pink" data-action="lib-play" data-id="${qz.id}">Play</button>
         <button class="btn" data-action="lib-edit" data-id="${qz.id}">${qz.builtin ? 'Copy and edit' : 'Edit'}</button>
+        <button class="btn btn-ghost sm" data-action="lib-print" data-id="${qz.id}">Print</button>
         ${qz.builtin ? '' : html`<button class="btn btn-ghost sm" data-action="lib-delete" data-id="${qz.id}">Delete</button>`}
       </div>
     </article>`;
@@ -255,6 +256,49 @@ function readHostOptions(f) {
 }
 
 actions['lib-play'] = ({ id }) => { const qz = findQuiz(id); if (qz) renderSetup(qz); };
+
+// ---------- Print a quiz (no devices needed) ----------
+const LETTERS = 'ABCD';
+function renderPrint(quiz) {
+  const date = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  setScreen('screen v-print', html`
+    <header class="topbar no-print">
+      <button class="btn btn-ghost" data-action="to-library">&larr; Back</button>
+      <div class="chip">Print: ${quiz.title}</div>
+      <div class="row">
+        <button class="btn btn-pink" data-action="do-print" data-what="both">Print worksheet and key</button>
+        <button class="btn btn-sky" data-action="do-print" data-what="sheet">Worksheet only</button>
+        <button class="btn" data-action="do-print" data-what="key">Answer key only</button>
+      </div>
+    </header>
+    <main class="printdoc">
+      <section class="sheetpage">
+        <h1>${quiz.emoji} ${quiz.title}</h1>
+        <p class="nameline">Name: <span class="blank"></span> Date: <span class="blank short"></span></p>
+        <p class="pdir">Circle the best answer for each question.</p>
+        <ol class="pq-list">${quiz.questions.map((q) => html`
+          <li class="pq-item">
+            <p class="pq-text">${q.text}</p>
+            <ul class="pq-opts">${q.options.map((o, i) => html`<li><span class="bubble">${LETTERS[i]}</span><span>${o}</span></li>`)}</ul>
+          </li>`)}
+        </ol>
+      </section>
+      <section class="keypage">
+        <h1>Answer key: ${quiz.title}</h1>
+        <p class="hint">${quiz.questions.length} questions. ${date}.</p>
+        <ol class="key-list">${quiz.questions.map((q) => html`
+          <li><b>${LETTERS[q.correct]}</b> ${q.options[q.correct]}${q.skill ? html` <span class="skchip">${q.skill}</span>` : ''}</li>`)}
+        </ol>
+      </section>
+    </main>`);
+}
+actions['lib-print'] = ({ id }) => { const qz = findQuiz(id); if (qz) renderPrint(qz); };
+actions['do-print'] = ({ what }) => {
+  document.body.dataset.printing = what;
+  const clear = () => { delete document.body.dataset.printing; window.removeEventListener('afterprint', clear); };
+  window.addEventListener('afterprint', clear);
+  window.print();
+};
 
 // ---------- Connection check ----------
 const checkSteps = () => [

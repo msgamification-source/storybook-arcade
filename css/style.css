@@ -647,3 +647,37 @@ textarea { resize: vertical; }
 .verdict { margin: 0 0 1rem; padding: .9rem 1.1rem; border: var(--line); border-radius: var(--radius); box-shadow: var(--pop); }
 .verdict p { margin: .3rem 0 0; }
 .verdict.good { background: var(--mint); } .verdict.warn { background: var(--sun); } .verdict.bad { background: var(--pink); }
+
+/* ---------- Print a quiz ---------- */
+.printdoc { width: 100%; max-width: 50rem; margin: 0 auto; background: var(--white); border: var(--line); border-radius: var(--radius); padding: 1.4rem 1.8rem; box-shadow: var(--pop); }
+.printdoc h1 { font-size: 1.7rem; margin: 0 0 .3rem; }
+.nameline { font-weight: 600; margin: .4rem 0; }
+.nameline .blank { display: inline-block; width: 16rem; border-bottom: 2px solid var(--ink); margin: 0 1.2rem 0 .3rem; }
+.nameline .blank.short { width: 8rem; }
+.pdir { color: var(--soft); margin: 0 0 1rem; }
+.pq-list { margin: 0; padding-left: 1.5rem; display: grid; gap: 1.1rem; }
+.pq-item { break-inside: avoid; page-break-inside: avoid; }
+.pq-text { font-weight: 700; margin: 0 0 .4rem; }
+.pq-opts { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
+.pq-opts li { display: flex; gap: .6rem; align-items: flex-start; }
+.bubble { flex: none; display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border: 2px solid var(--ink); border-radius: 50%; font-weight: 700; font-size: .85rem; }
+.keypage { margin-top: 2rem; padding-top: 1.2rem; border-top: 3px dashed var(--soft); }
+.key-list { margin: .6rem 0 0; padding-left: 1.5rem; display: grid; gap: .4rem; }
+.key-list li { break-inside: avoid; }
+
+@media print {
+  @page { margin: 0.5in; }
+  .printdoc { border: 0; box-shadow: none; padding: 0; max-width: none; font-size: 11pt; line-height: 1.3; }
+  .printdoc h1 { font-size: 18pt; margin-bottom: .1rem; }
+  .printdoc .nameline { margin: .2rem 0; }
+  .printdoc .pdir { margin-bottom: .5rem; }
+  .pq-list { gap: .8rem; }
+  .pq-text { margin-bottom: .2rem; }
+  .pq-opts { gap: .28rem; }
+  .bubble { width: 1.3rem; height: 1.3rem; font-size: 9pt; }
+  .keypage { break-before: page; page-break-before: always; margin-top: 0; padding-top: 0; border-top: 0; }
+  body[data-printing="sheet"] .keypage { display: none !important; }
+  body[data-printing="key"] .sheetpage { display: none !important; }
+  body[data-printing="key"] .keypage { break-before: auto; page-break-before: auto; }
+  .v-print .skchip { border-width: 1px; }
+}

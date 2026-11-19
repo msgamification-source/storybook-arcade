@@ -131,6 +131,14 @@ The game uses simple built-in beeps. To use your own sounds, put the files in `a
 them in `js/config.js` (see the instructions in `assets/sounds/README.txt`). Any sound you do not
 replace keeps its beep.
 
+## Print a quiz (no devices needed)
+
+Every quiz card has a **Print** button. It makes a one or two page student **worksheet** (name and date line,
+lettered answer choices to circle) and a separate **answer key** with the skill for each question. Choose
+**Print worksheet and key**, **Worksheet only** or **Answer key only**. It works for quizzes you make yourself
+too, and it needs nothing but the teacher's computer, which makes it a good backup when student devices can
+not reach the game.
+
 ## Make your own quizzes
 
 Tap **+ New quiz** in the teacher menu. Write a question, fill in 2 to 4 answers, tap the circle
